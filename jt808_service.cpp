@@ -289,50 +289,57 @@ int jt808_service::accept_new_client()
 
 	if (!recv_frame_data(new_sock, m_msg)) {
 		cmd = jt808_frame_parse(m_msg, propara);
-		if (cmd > 0) {
-			memset(msg.data, 0x0, MAX_PROFRAMEBUF_LEN);
-			msg.len = jt808_frame_pack(msg, cmd, propara);
-			send_frame_data(new_sock, msg);
-			if (propara.bpara1 == 0x0) {
-				if (!m_list.empty()) {
-					it = m_list.begin();
-					while (it != m_list.end()) {
-						str2bcd(it->pnum, pnum);
-						if (!strncmp((char *)pnum, (char *)propara.strpara1, 6))
-							break;
-						else
-						++it;
+		switch (cmd) {
+			case UP_REGISTER:
+				memset(msg.data, 0x0, MAX_PROFRAMEBUF_LEN);
+				msg.len = jt808_frame_pack(msg, DOWN_REGISTERRSPONSE, propara);
+				send_frame_data(new_sock, msg);
+				if (propara.bpara1 == 0x0) {
+					if (!m_list.empty()) {
+						it = m_list.begin();
+						while (it != m_list.end()) {
+							str2bcd(it->pnum, pnum);
+							if (!strncmp((char *)pnum, (char *)propara.strpara1, 6))
+								break;
+							else
+								++it;
+						}
+						if (it != m_list.end()) {
+							it->sockfd = new_sock;
+							node = *it;
+							m_list.erase(it);
+							m_list.push_back(node);
+						}
 					}
-					if (it != m_list.end()) {
-						it->sockfd = new_sock;
-						node = *it;
-						m_list.erase(it);
-						m_list.push_back(node);
+				} else {
+					close(new_sock);
+					new_sock = -1;
+					break;
+				}
+
+				if (!recv_frame_data(new_sock, msg)) {
+					cmd = jt808_frame_parse(msg, propara);
+					if (cmd != UP_AUTHENTICATION) {
+						close(new_sock);
+						new_sock = -1;
+						break;
 					}
 				}
-			} else {
+			case UP_AUTHENTICATION:
+				memset(msg.data, 0x0, MAX_PROFRAMEBUF_LEN);
+				m_msg.len = jt808_frame_pack(msg, DOWN_UNIRESPONSE, propara);
+				send_frame_data(new_sock, msg);
+				break;
+			default:
 				close(new_sock);
-				return -1;
-			}
-		} else {
-			close(new_sock);
-			return -1;
+				new_sock = -1;
+				break;
 		}
 	}
 
-	if (!recv_frame_data(new_sock, msg)) {
-		cmd = jt808_frame_parse(msg, propara);
-		if (cmd > 0) {
-			memset(msg.data, 0x0, MAX_PROFRAMEBUF_LEN);
-			m_msg.len = jt808_frame_pack(msg, cmd, propara);
-			send_frame_data(new_sock, msg);
-		} else {
-			close(new_sock);
-			return -1;
-		}
-	}
+	if (new_sock > 0)
+		epoll_register(m_epoll_fd, new_sock);
 
-	epoll_register(m_epoll_fd, new_sock);
 	return new_sock;
 }
 
@@ -558,7 +565,6 @@ uint16_t jt808_service::jt808_frame_parse(message_t &msg, propara_t &propara)
 	uint8_t *msg_body;
 	uint32_t temp;
 	uint16_t msg_len;
-	uint16_t ret = 0;
 	uint8_t pnum[6] = {0};
 	decltype (m_list.begin()) it;
 
@@ -602,7 +608,6 @@ uint16_t jt808_service::jt808_frame_parse(message_t &msg, propara_t &propara)
 			} else {
 				propara.bpara1 = 2;
 			}
-			ret = DOWN_REGISTERRSPONSE;
 			break;
 		case UP_AUTHENTICATION:
 			memset(&propara, 0x0, sizeof(struct propara_t));
@@ -627,7 +632,6 @@ uint16_t jt808_service::jt808_frame_parse(message_t &msg, propara_t &propara)
 			} else {
 				propara.bpara1 = 1;
 			}
-			ret = DOWN_UNIRESPONSE;
 			break;
 		case UP_UNIRESPONSE:
 			temp = msg_body[2]*0x100 + msg_body[3];
@@ -664,7 +668,7 @@ uint16_t jt808_service::jt808_frame_parse(message_t &msg, propara_t &propara)
 			break;
 	}
 
-	return ret;
+	return msghead_ptr->id;
 }
 
 int jt808_service::parse_commond(const char *buffer)
