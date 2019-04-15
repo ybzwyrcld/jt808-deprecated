@@ -38,7 +38,7 @@
 
 struct message_t {
 	uint8_t data[MAX_PROFRAMEBUF_LEN];
-	int16_t len;
+	uint16_t len;
 };
 
 // 终端参数

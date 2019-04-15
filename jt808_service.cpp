@@ -420,7 +420,7 @@ int jt808_service::send_frame_data(const int &fd, const message_t &msg)
 	ret = send(fd, msg.data, msg.len, 0);
 	if (ret < 0) {
 		if ((errno == EAGAIN) || (errno == EWOULDBLOCK) || (errno == EINTR)) {
-			printf("%s[%d]: no data to send, continue\n", __FILE__, __LINE__);
+			//printf("%s[%d]: no data to send, continue\n", __FILE__, __LINE__);
 			ret = 0;
 		} else {
 			if (errno == EPIPE) {
@@ -445,7 +445,7 @@ int jt808_service::recv_frame_data(const int &fd, message_t &msg)
 	ret = recv(fd, msg.data, MAX_PROFRAMEBUF_LEN, 0);
 	if (ret < 0) {
 		if ((errno == EAGAIN) || (errno == EWOULDBLOCK) || (errno == EINTR)) {
-			printf("%s[%d]: no data to receive, continue\n", __FILE__, __LINE__);
+			//printf("%s[%d]: no data to receive, continue\n", __FILE__, __LINE__);
 			ret = 0;
 		} else {
 			ret = -1;
@@ -798,20 +798,25 @@ void jt808_service::update_handler(void)
 				m_list.push_back(node);
 				break;
 			} else {
-				usleep(1000);
-				memset(msg.data, 0x0, MAX_PROFRAMEBUF_LEN);
-				if (recv_frame_data(node.sockfd, m_msg)) {
-					close(node.sockfd);
-					node.sockfd = -1;
-					m_list.erase(it);
-					m_list.push_back(node);
-					break;
-				} else {
-					jt808_frame_parse(m_msg, propara);
+				while (1) {
+					if (recv_frame_data(node.sockfd, msg)) {
+						close(node.sockfd);
+						node.sockfd = -1;
+						m_list.erase(it);
+						m_list.push_back(node);
+						break;
+					} else if (msg.len) {
+						jt808_frame_parse(msg, propara);
+						break;
+					}
 				}
+
+				if (node.sockfd == -1)
+					break;
+
+				++propara.wpara4;
+				usleep(1000);
 			}
-			++propara.wpara4;
-			usleep(1000);
 		}
 
 		if (node.sockfd > 0) {
