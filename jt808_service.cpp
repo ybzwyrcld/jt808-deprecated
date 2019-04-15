@@ -298,7 +298,7 @@ int jt808_service::accept_new_client()
 					if (!m_list.empty()) {
 						it = m_list.begin();
 						while (it != m_list.end()) {
-							str2bcd(it->pnum, pnum);
+							str2bcd_compress(it->pnum, pnum);
 							if (!strncmp((char *)pnum, (char *)propara.strpara1, 6))
 								break;
 							else
@@ -467,6 +467,7 @@ int jt808_service::jt808_frame_pack(message_t &msg, const uint16_t &cmd, const p
 {
 	struct message_head *msghead_ptr;
 	uint8_t *msg_body;
+	uint16_t u16temp;
 
 	msghead_ptr = (struct message_head *)&msg.data[1];
 	msghead_ptr->id = endian_swap16(cmd);
@@ -475,8 +476,12 @@ int jt808_service::jt808_frame_pack(message_t &msg, const uint16_t &cmd, const p
 	if (propara.wpara3 > 1) {
 		msghead_ptr->attribute.bit.package = 1;
 		msg_body = &msg.data[MSGBODY_PACKAGE_POS];
-		*(uint16_t*)&msg.data[13] = endian_swap16(propara.wpara3);
-		*(uint16_t*)&msg.data[15] = endian_swap16(propara.wpara4);
+		u16temp = propara.wpara3;
+		u16temp = endian_swap16(u16temp);
+		memcpy(&msg.data[13], &u16temp, 2);
+		u16temp = propara.wpara4;
+		u16temp = endian_swap16(u16temp);
+		memcpy(&msg.data[15], &u16temp, 2);
 		msg.len = 16;
 	} else {
 		msghead_ptr->attribute.bit.package = 0;
@@ -563,9 +568,16 @@ uint16_t jt808_service::jt808_frame_parse(message_t &msg, propara_t &propara)
 {
 	struct message_head *msghead_ptr;
 	uint8_t *msg_body;
-	uint32_t temp;
-	uint16_t msg_len;
-	uint8_t pnum[6] = {0};
+	uint8_t pnum[12] = {0};
+	uint16_t u16temp;
+	uint16_t msglen;
+	uint32_t u32temp;
+	double latitude;
+	double longitude;
+	float altitude;
+	float speed;
+	float bearing;
+	char timestamp[6];
 	decltype (m_list.begin()) it;
 
 	msg.len = reverse_escape(&msg.data[1], msg.len);
@@ -580,7 +592,7 @@ uint16_t jt808_service::jt808_frame_parse(message_t &msg, propara_t &propara)
 
 	msghead_ptr->msgflownum = endian_swap16(msghead_ptr->msgflownum);
 	msghead_ptr->id = endian_swap16(msghead_ptr->id);
-	msg_len = (uint16_t)(msghead_ptr->attribute.bit.msglen);
+	msglen = (uint16_t)(msghead_ptr->attribute.bit.msglen);
 	switch (msghead_ptr->id) {
 		case UP_REGISTER:
 			memset(&propara, 0x0, sizeof(struct propara_t));
@@ -589,7 +601,7 @@ uint16_t jt808_service::jt808_frame_parse(message_t &msg, propara_t &propara)
 			if (!m_list.empty()) {
 			it = m_list.begin();
 				while (it != m_list.end()) {
-					str2bcd(it->pnum, pnum);
+					str2bcd_compress(it->pnum, pnum);
 					if (!strncmp((char *)pnum, (char *)msghead_ptr->phone, 6))
 						break;
 					else
@@ -617,13 +629,13 @@ uint16_t jt808_service::jt808_frame_parse(message_t &msg, propara_t &propara)
 			if (!m_list.empty()) {
 				it = m_list.begin();
 				while (it != m_list.end()) {
-					str2bcd(it->pnum, pnum);
+					str2bcd_compress(it->pnum, pnum);
 					if (!strncmp((char *)pnum, (char *)msghead_ptr->phone, 6))
 						break;
 					else
 						++it;
 				}
-				if ((it != m_list.end()) && (msg_len == 4)
+				if ((it != m_list.end()) && (msglen == 4)
 						&& !strncmp((char *)it->acode, (char *)msg_body, 4)) {
 					propara.bpara1 = 0;
 				} else {
@@ -634,8 +646,9 @@ uint16_t jt808_service::jt808_frame_parse(message_t &msg, propara_t &propara)
 			}
 			break;
 		case UP_UNIRESPONSE:
-			temp = msg_body[2]*0x100 + msg_body[3];
-			switch(temp) {
+			memcpy(&u16temp, &msg_body[2], 2);
+			u16temp = endian_swap16(u16temp);
+			switch(u16temp) {
 				case DOWN_UPDATEPACKAGE:
 					printf("%s[%d]: received updatepackage respond: ", __FILE__, __LINE__);
 					break;
@@ -664,6 +677,35 @@ uint16_t jt808_service::jt808_frame_parse(message_t &msg, propara_t &propara)
 				printf("message not support\r\n");
 			}
 			break;
+		case UP_POSITIONREPORT:
+			printf("%s[%d]: received position report respond:\n", __FILE__, __LINE__);
+			memset(pnum, 0x0, sizeof(pnum));
+			bcd2str_compress(msghead_ptr->phone, pnum, 6);
+			printf("\tdevice: %s\n", pnum);
+			memcpy(&u32temp, &msg_body[12], 4);
+			latitude = endian_swap32(u32temp) / 1000000.0;
+			printf("\tlatitude: %lf\n", latitude);
+			memcpy(&u32temp, &msg_body[8], 4);
+			longitude = endian_swap32(u32temp) / 1000000.0;
+			printf("\tlongitude: %lf\n", longitude);
+			memcpy(&u16temp, &msg_body[16], 2);
+			altitude = endian_swap16(u16temp);
+			printf("\taltitude: %f\n", altitude);
+			memcpy(&u16temp, &msg_body[18], 2);
+			speed = endian_swap16(u16temp) / 10.0;
+			printf("\tspeed: %f\n", speed);
+			memcpy(&u16temp, &msg_body[20], 2);
+			bearing = endian_swap16(u16temp);
+			printf("\tbearing: %f\n", bearing);
+			timestamp[0] = bcd2hex(msg_body[22]);
+			timestamp[1] = bcd2hex(msg_body[23]);
+			timestamp[2] = bcd2hex(msg_body[24]);
+			timestamp[3] = bcd2hex(msg_body[25]);
+			timestamp[4] = bcd2hex(msg_body[26]);
+			timestamp[5] = bcd2hex(msg_body[27]);
+			printf("\ttimestamp: 20%02d-%02d-%02d, %02d:%02d:%02d\n", timestamp[0], timestamp[1], timestamp[2]
+					, timestamp[3], timestamp[4], timestamp[5]);
+			printf("%s[%d]: received position report respond end\n", __FILE__, __LINE__);
 		default:
 			break;
 	}
