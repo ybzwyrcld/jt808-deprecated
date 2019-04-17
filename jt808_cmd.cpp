@@ -17,9 +17,9 @@ using std::string;
 
 void print_usage(void)
 {
-	cout << "Usage: skconfig [options]" << endl;
+	cout << "Usage: jt808-cmd [options]" << endl;
 	cout << "Options:" << endl;
-	cout << "update [phone num] [device/gpsfw] [version id] [path]" << endl;
+	cout << "update [phone number] [device/gpsfw] [version id] [file path]" << endl;
 
 	exit(0);
 }

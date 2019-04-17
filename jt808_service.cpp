@@ -3,15 +3,15 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <errno.h>
 #include <signal.h>
+#include <errno.h>
 #include <time.h>
 #include <assert.h>
 #include <sys/epoll.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include <thread>
 
 #include <iostream>
@@ -294,24 +294,7 @@ int jt808_service::accept_new_client()
 				memset(msg.data, 0x0, MAX_PROFRAMEBUF_LEN);
 				msg.len = jt808_frame_pack(msg, DOWN_REGISTERRSPONSE, propara);
 				send_frame_data(new_sock, msg);
-				if (propara.bpara1 == 0x0) {
-					if (!m_list.empty()) {
-						it = m_list.begin();
-						while (it != m_list.end()) {
-							str2bcd_compress(it->pnum, pnum);
-							if (!strncmp((char *)pnum, (char *)propara.strpara1, 6))
-								break;
-							else
-								++it;
-						}
-						if (it != m_list.end()) {
-							it->sockfd = new_sock;
-							node = *it;
-							m_list.erase(it);
-							m_list.push_back(node);
-						}
-					}
-				} else {
+				if (propara.bpara1 != 0x0) {
 					close(new_sock);
 					new_sock = -1;
 					break;
@@ -329,6 +312,25 @@ int jt808_service::accept_new_client()
 				memset(msg.data, 0x0, MAX_PROFRAMEBUF_LEN);
 				m_msg.len = jt808_frame_pack(msg, DOWN_UNIRESPONSE, propara);
 				send_frame_data(new_sock, msg);
+				if (propara.bpara1 != 0x0) {
+					close(new_sock);
+					new_sock = -1;
+				} else if (!m_list.empty()) {
+					it = m_list.begin();
+					while (it != m_list.end()) {
+						str2bcd_compress(it->pnum, pnum);
+						if (!strncmp((char *)pnum, (char *)propara.strpara1, 6))
+							break;
+						else
+							++it;
+					}
+					if (it != m_list.end()) {
+						it->sockfd = new_sock;
+						node = *it;
+						m_list.erase(it);
+						m_list.push_back(node);
+					}
+				}
 				break;
 			default:
 				close(new_sock);
