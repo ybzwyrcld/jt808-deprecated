@@ -12,6 +12,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <thread>
 
 #include <iostream>
@@ -286,6 +287,16 @@ int jt808_service::accept_new_client()
 	socklen_t clilen = sizeof(struct sockaddr);
 
 	int new_sock = accept(m_listen_sock, (struct sockaddr*)&client_addr, &clilen);
+
+	int keepalive = 1;  /* enable keepalive attributes. */
+	int keepidle = 60;  /* time out for starting detection. */
+	int keepinterval = 5;  /* time interval for sending packets during detection. */
+	int keepcount = 3;  /* max times for sending packets during detection. */
+
+	setsockopt(new_sock, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive, sizeof(keepalive));
+	setsockopt(new_sock, SOL_TCP, TCP_KEEPIDLE, (void*)&keepidle, sizeof(keepidle));
+	setsockopt(new_sock, SOL_TCP, TCP_KEEPINTVL, (void *)&keepinterval, sizeof(keepinterval));
+	setsockopt(new_sock, SOL_TCP, TCP_KEEPCNT, (void *)&keepcount, sizeof(keepcount));
 
 	if (!recv_frame_data(new_sock, m_msg)) {
 		cmd = jt808_frame_parse(m_msg, propara);
