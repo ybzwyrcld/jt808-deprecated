@@ -539,7 +539,7 @@ int jt808_service::jt808_frame_pack(message_t &msg, const uint16_t &cmd, const p
 			msg_body ++;
 			msg_body += 5;
 			msg.len += 6;
-			*msg_body = 8;
+			*msg_body = propara.bpara2;
 			msg_body++;
 			msg.len++;
 			memcpy(msg_body, propara.strpara2, strlen((char *)propara.strpara2));
@@ -839,6 +839,7 @@ void jt808_service::update_handler(void)
 		propara.wpara3 = len/max_data_len + 1;
 		propara.wpara4 = 1;
 		propara.bpara1 = it->type;
+		propara.bpara2 = strlen((char *)it->verid);
 
 		propara.strpara3 = new unsigned char [1024];
 		while (len > 0) {
