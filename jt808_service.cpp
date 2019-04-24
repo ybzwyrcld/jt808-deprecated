@@ -753,11 +753,17 @@ int jt808_service::parse_commond(const char *buffer)
 			if (it != m_list.end()) {
 				ss >> s;
 				//std::cout << s << std::endl;
-				if ((s == "device") || (s == "gpsfw")) {
+				if ((s == "device") || (s == "gpsfw") || (s == "system") || (s == "cdrfw")) {
 					if (s == "device")
 						it->type = 0x0;
-					else
+					else if (s == "gpsfw")
 						it->type = 0x34;
+					else if (s == "cdrfw")
+						it->type = 0x35;
+					else if (s == "system")
+						it->type = 0x36;
+					else
+						return -1;
 
 					ss >> s;
 					//std::cout << s << std::endl;

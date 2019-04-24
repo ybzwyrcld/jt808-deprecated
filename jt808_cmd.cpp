@@ -19,7 +19,7 @@ void print_usage(void)
 {
 	cout << "Usage: jt808-cmd [options]" << endl;
 	cout << "Options:" << endl;
-	cout << "update [phone number] [device/gpsfw] [version id] [file path]" << endl;
+	cout << "update [phone number] [device/gpsfw/cdrfw/system] [version id] [file path]" << endl;
 
 	exit(0);
 }
