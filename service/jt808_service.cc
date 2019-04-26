@@ -297,7 +297,7 @@ int Jt808Service::AcceptNewClient(void) {
         memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
         msg.len = Jt808FramePack(msg, DOWN_REGISTERRSPONSE, propara);
         SendFrameData(new_sock, msg);
-        if (propara.bytepara1 != 0x0) {
+        if (propara.respond_result != 0x0) {
           close(new_sock);
           new_sock = -1;
           break;
@@ -315,7 +315,7 @@ int Jt808Service::AcceptNewClient(void) {
         memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
         message_.len = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
         SendFrameData(new_sock, msg);
-        if (propara.bytepara1 != 0x0) {
+        if (propara.respond_result != 0x0) {
           close(new_sock);
           new_sock = -1;
         } else if (!list_.empty()) {
@@ -323,12 +323,13 @@ int Jt808Service::AcceptNewClient(void) {
           while (it != list_.end()) {
             BcdFromStringCompress(it->phone_num,
                                   phone_num, strlen(it->phone_num));
-            if (memcmp(phone_num, propara.stringpara1, 6) == 0)
+            if (memcmp(phone_num, propara.phone_num, 6) == 0)
               break;
             else
               ++it;
           }
           if (it != list_.end()) {
+            memcpy(it->manufacturer_id, propara.manufacturer_id, 5);
             it->socket_fd = new_sock;
             node = *it;
             list_.erase(it);
@@ -461,21 +462,20 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
   uint8_t *msg_body;
   uint16_t u16temp;
   uint32_t u32temp;
-  size_t len;
 
   msghead_ptr = (MessageHead *)&msg.buffer[1];
   msghead_ptr->id = EndianSwap16(command);
   msghead_ptr->attribute.val = 0x0000;
   msghead_ptr->attribute.bit.encrypt = 0;
-  if (propara.wordpara3 > 1) {  // need to divide the package.
+  if (propara.packet_total_num > 1) {  // need to divide the package.
     msghead_ptr->attribute.bit.package = 1;
     msg_body = &msg.buffer[MSGBODY_PACKAGE_POS];
     // packet total num.
-    u16temp = propara.wordpara3;
+    u16temp = propara.packet_total_num;
     u16temp = EndianSwap16(u16temp);
     memcpy(&msg.buffer[13], &u16temp, 2);
     // packet sequence num.
-    u16temp = propara.wordpara4;
+    u16temp = propara.packet_sequence_num;
     u16temp = EndianSwap16(u16temp);
     memcpy(&msg.buffer[15], &u16temp, 2);
     msg.len = 16;
@@ -487,20 +487,20 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
 
   message_flow_num_++;
   msghead_ptr->msgflownum = EndianSwap16(message_flow_num_);
-  memcpy(msghead_ptr->phone, propara.stringpara1, 6);
+  memcpy(msghead_ptr->phone, propara.phone_num, 6);
 
   switch (command) {
     case DOWN_UNIRESPONSE:
       // terminal message flow num.
-      u16temp = EndianSwap16(propara.wordpara1);
+      u16temp = EndianSwap16(propara.respond_flow_num);
       memcpy(msg_body, &u16temp, 2);
       msg_body += 2;
       // terminal message id.
-      u16temp = EndianSwap16(propara.wordpara2);
+      u16temp = EndianSwap16(propara.respond_id);
       memcpy(msg_body, &u16temp, 2);
       msg_body += 2;
       // result.
-      *msg_body = propara.bytepara1;
+      *msg_body = propara.respond_result;
       msg_body++;
       msghead_ptr->attribute.bit.msglen = 5;
       msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
@@ -508,15 +508,15 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       break;
     case DOWN_REGISTERRSPONSE:
       // terminal message flow num.
-      u16temp = EndianSwap16(propara.wordpara1);
+      u16temp = EndianSwap16(propara.respond_flow_num);
       memcpy(msg_body, &u16temp, 2);
       msg_body += 2;
       // result.
-      *msg_body = propara.bytepara1;
+      *msg_body = propara.respond_result;
       msg_body++;
-      if (propara.bytepara1 == 0) {
+      if (propara.respond_result == 0) {
         // send authen code if success.
-        memcpy(msg_body, propara.stringpara2, 4);
+        memcpy(msg_body, propara.authen_code, 4);
         msg_body += 4;
         msghead_ptr->attribute.bit.msglen = 7;
         msg.len += 7;
@@ -528,29 +528,30 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       break;
     case DOWN_UPDATEPACKAGE:
       // upgrade type.
-      *msg_body = propara.bytepara1;
-      msg_body ++;
+      *msg_body = propara.upgrade_type;
+      msg_body++;
+      memcpy(msg_body, propara.manufacturer_id, 5);
       msg_body += 5;
       msg.len += 6;
       // length of upgrade version name.
-      *msg_body = propara.bytepara2;
+      *msg_body = propara.version_num_len;
       msg_body++;
       msg.len++;
       // upgrade version name.
-      memcpy(msg_body, propara.stringpara2, sizeof(propara.stringpara2));
-      len = strlen((char *)(propara.stringpara2));
-      msg_body += len;
-      msg.len += len;
-      // length of valid content.
-      u32temp = EndianSwap32(propara.wordpara1);
+      memcpy(msg_body, propara.version_num, propara.version_num_len);
+      msg_body += propara.version_num_len;
+      msg.len += propara.version_num_len;
+      // length of valid data content.
+      u32temp = EndianSwap32(propara.packet_data_len);
       memcpy(msg_body, &u32temp, 4);
       msg_body += 4;
       msg.len += 4;
       // valid content of the upgrade file.
-      memcpy(msg_body, propara.stringpara3, propara.wordpara1);
-      msg_body += propara.wordpara1;
-      msg.len += propara.wordpara1;
-      msghead_ptr->attribute.bit.msglen = 11 + len + propara.wordpara1;
+      memcpy(msg_body, propara.packet_data, propara.packet_data_len);
+      msg_body += propara.packet_data_len;
+      msg.len += propara.packet_data_len;
+      msghead_ptr->attribute.bit.msglen = 11 + propara.version_num_len +
+                                          propara.packet_data_len;
       msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
       break;
     default:
@@ -608,8 +609,8 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   switch (msghead_ptr->id) {
     case UP_REGISTER:
       memset(&propara, 0x0, sizeof(propara));
-      propara.wordpara1 = msghead_ptr->msgflownum;
-      memcpy(propara.stringpara1, msghead_ptr->phone, 6);
+      propara.respond_flow_num = msghead_ptr->msgflownum;
+      memcpy(propara.phone_num, msghead_ptr->phone, 6);
       // check phone num.
       if (!list_.empty()) {
       it = list_.begin();
@@ -623,23 +624,24 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
         }
         if (it != list_.end()) { // find phone num.
           if (it->socket_fd == -1) { // make sure there is no device connection.
-            propara.bytepara1 = 0;
-            memcpy(propara.stringpara2, it->authen_code, 4);
+            propara.respond_result = 0;
+            memcpy(propara.authen_code, it->authen_code, 4);
+            memcpy(propara.manufacturer_id, &msg_body[4], 5);
           } else {
-            propara.bytepara1 = 3;
+            propara.respond_result = 3;
           }
         } else {
-          propara.bytepara1 = 4;
+          propara.respond_result = 4;
         }
       } else {
-        propara.bytepara1 = 2;
+        propara.respond_result = 2;
       }
       break;
     case UP_AUTHENTICATION:
       memset(&propara, 0x0, sizeof(propara));
-      propara.wordpara1 = msghead_ptr->msgflownum;
-      propara.wordpara2 = msghead_ptr->id;
-      memcpy(propara.stringpara1, msghead_ptr->phone, 6);
+      propara.respond_flow_num = msghead_ptr->msgflownum;
+      propara.respond_id = msghead_ptr->id;
+      memcpy(propara.phone_num, msghead_ptr->phone, 6);
       if (!list_.empty()) {
         it = list_.begin();
         while (it != list_.end()) {
@@ -652,19 +654,19 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
         }
         if ((it != list_.end()) &&
             (memcmp(it->authen_code, msg_body, msglen) == 0)) {
-          propara.bytepara1 = 0;
+          propara.respond_result = 0;
         } else {
-          propara.bytepara1 = 1;
+          propara.respond_result = 1;
         }
       } else {
-        propara.bytepara1 = 1;
+        propara.respond_result = 1;
       }
       break;
     case UP_UNIRESPONSE:
       // message id.
       memcpy(&u16temp, &msg_body[2], 2);
       u16temp = EndianSwap16(u16temp);
-      memcpy(&propara.wordpara2, &u16temp, 2);
+      memcpy(&propara.respond_id, &u16temp, 2);
       switch(u16temp) {
         case DOWN_UPDATEPACKAGE:
           printf("%s[%d]: received updatepackage respond: ",
@@ -824,7 +826,9 @@ void Jt808Service::UpgradeHandler(void) {
   if (strlen(node.phone_num) == 0)
     return ;
 
-  memcpy(propara.stringpara2, node.upgrade_version, strlen(node.upgrade_version));
+  memset(&propara, 0x0, sizeof(propara));
+  memcpy(propara.version_num,
+         node.upgrade_version, strlen(node.upgrade_version));
   max_data_len = 1023 - 11 - strlen(node.upgrade_version);
   EpollUnRegister(epoll_fd_, node.socket_fd);
   //printf("path: %s\n", file_path);
@@ -838,27 +842,26 @@ void Jt808Service::UpgradeHandler(void) {
     ifs.close();
 
     // packet total num.
-    propara.wordpara3 = len/max_data_len + 1;
+    propara.packet_total_num = len/max_data_len + 1;
     // packet sequence num.
-    propara.wordpara4 = 1;
+    propara.packet_sequence_num = 1;
     // upgrade type.
-    propara.bytepara1 = node.upgrade_type;
+    propara.upgrade_type = node.upgrade_type;
     // upgrade version name len.
-    propara.bytepara2 = strlen(node.upgrade_version);
+    propara.version_num_len = strlen(node.upgrade_version);
     // valid content of the upgrade file.
-    propara.stringpara3 = new unsigned char [1024];
     while (len > 0) {
       memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
       if (len > max_data_len)
-        propara.wordpara1 = max_data_len; // length of valid content.
+        propara.packet_data_len = max_data_len; // length of valid content.
       else
-        propara.wordpara1 = len;
-      len -= propara.wordpara1;
+        propara.packet_data_len = len;
+      len -= propara.packet_data_len;
       //printf("sum packet = %d, sub packet = %d\n",
-      //       propara.wordpara3, propara.wordpara4);
-      memset(propara.stringpara3, 0x0, 1024);
-      memcpy(propara.stringpara3,
-             data + max_data_len * (propara.wordpara4 - 1), propara.wordpara1);
+      //       propara.packet_total_num, propara.packet_sequence_num);
+      memset(propara.packet_data, 0x0, sizeof(propara.packet_data));
+      memcpy(propara.packet_data,
+             data + max_data_len * (propara.packet_sequence_num - 1), propara.packet_data_len);
       msg.len = Jt808FramePack(msg, DOWN_UPDATEPACKAGE, propara);
       if (SendFrameData(node.socket_fd, msg)) {
         close(node.socket_fd);
@@ -873,7 +876,7 @@ void Jt808Service::UpgradeHandler(void) {
             break;
           } else if (msg.len > 0) {
             if ((Jt808FrameParse(msg, propara) == UP_UNIRESPONSE) &&
-                (propara.wordpara2 == DOWN_UPDATEPACKAGE))
+                (propara.respond_id == DOWN_UPDATEPACKAGE))
             break;
           }
         }
@@ -881,7 +884,7 @@ void Jt808Service::UpgradeHandler(void) {
         if (node.socket_fd == -1)
           break;
 
-        ++propara.wordpara4;
+        ++propara.packet_sequence_num;
         usleep(1000);
       }
     }
@@ -891,7 +894,6 @@ void Jt808Service::UpgradeHandler(void) {
     }
 
     delete [] data;
-    delete [] propara.stringpara3;
     data = nullptr;
   }
 

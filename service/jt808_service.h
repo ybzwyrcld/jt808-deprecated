@@ -19,6 +19,7 @@ struct Node {
   bool upgrading;
   char phone_num[12];
   char authen_code[8];
+  char manufacturer_id[5];
   char upgrade_version[12];
   char upgrade_type;
   char file_path[128];

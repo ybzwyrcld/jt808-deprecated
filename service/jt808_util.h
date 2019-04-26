@@ -43,21 +43,19 @@ struct MessageData {
 
 // 终端参数
 struct ProtocolParameters {
-  uint8_t bytepara1;
-  uint8_t bytepara2;
-  uint8_t bytepara3;
-  uint8_t bytepara4;
-  uint16_t wordpara1;
-  uint16_t wordpara2;
-  uint16_t wordpara3;
-  uint16_t wordpara4;
-  uint32_t dwordpara1;
-  uint32_t dwordpara2;
-  uint32_t dwordpara3;
-  uint32_t dwordpara4;
-  uint8_t stringpara1[128];
-  uint8_t stringpara2[256];
-  uint8_t *stringpara3;
+  uint8_t respond_result;
+  uint8_t version_num_len;
+  uint8_t upgrade_type;
+  uint16_t respond_flow_num;
+  uint16_t respond_id;
+  uint16_t packet_total_num;
+  uint16_t packet_sequence_num;
+  uint32_t packet_data_len;
+  uint8_t manufacturer_id[5];
+  uint8_t phone_num[6];
+  uint8_t authen_code[4];
+  uint8_t version_num[32];
+  uint8_t packet_data[1024];
 };
 
 // 消息体属性
