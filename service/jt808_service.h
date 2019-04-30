@@ -56,6 +56,14 @@ public:
                      const ProtocolParameters &propara);
 
   uint16_t Jt808FrameParse(MessageData &msg, ProtocolParameters &propara);
+
+  int DealGetStartupRequest(DeviceNode *device, char *result);
+  int DealGetGpsRequest(DeviceNode *device, char *result);
+  int DealGetCdradioRequest(DeviceNode *device, char *result);
+  int DealGetNtripCorsRequest(DeviceNode *device, char *result);
+  int DealGetNtripServiceRequest(DeviceNode *device, char *result);
+  int DealGetJt808ServiceRequest(DeviceNode *device, char *result);
+
   int ParseCommand(char *command);
 
   // upgrade thread.

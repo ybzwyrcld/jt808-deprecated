@@ -184,11 +184,11 @@
 // STRING  密码
 #define NTRIPCORSPASSWD       0xF033
 // STRING  挂载点
-#define NTRIPCORSMOUNTPOINT   0xF035
+#define NTRIPCORSMOUNTPOINT   0xF034
 // BYTE    GGA认证标志
-#define NTRIPCORSGGAAUTHEN    0xF036
+#define NTRIPCORSGGAAUTHEN    0xF035
 // BYTE    GGA发送频率
-#define NTRIPCORSGGASENDFREQ  0xF037
+#define NTRIPCORSGGASENDFREQ  0xF036
 
 // NTRIP 后台
 // STRING  地址
@@ -200,11 +200,11 @@
 // STRING  密码
 #define NTRIPSERVICEPASSWD               0xF043
 // STRING  挂载点
-#define NTRIPSERVICEMOUNTPOINT           0xF045
+#define NTRIPSERVICEMOUNTPOINT           0xF044
 // BYTE    GGA认证标志
-#define NTRIPSERVICEGGAAUTHEN            0xF046
+#define NTRIPSERVICEGGAAUTHEN            0xF045
 // BYTE    GGA发送频率
-#define NTRIPSERVICEGGASENDFREQ          0xF047
+#define NTRIPSERVICEGGASENDFREQ          0xF046
 
 // JT808 后台
 // STRING  地址
@@ -228,11 +228,11 @@ enum ParametersType {
 };
 
 // 终端参数
-struct TerminalParameters {
-  uint8_t parameters_len;
-  uint8_t parameters_type;
-  uint32_t parameters_id;
-  uint8_t parameters_value[32];
+struct TerminalParameter {
+  uint8_t parameter_len;
+  uint8_t parameter_type;
+  uint32_t parameter_id;
+  uint8_t parameter_value[32];
 };
 
 #pragma pack(pop)

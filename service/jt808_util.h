@@ -65,7 +65,7 @@ struct ProtocolParameters {
   uint8_t authen_code[4];
   uint8_t version_num[32];
   uint8_t packet_data[1024];
-  std::list<TerminalParameters *> *terminal_parameters_list;
+  std::list<TerminalParameter *> *terminal_parameter_list;
 };
 
 // 消息体属性

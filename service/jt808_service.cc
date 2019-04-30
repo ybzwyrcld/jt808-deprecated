@@ -527,16 +527,16 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       break;
     case DOWN_GETSPECTERMPARA:
       // terminal parameters total num.
-      *msg_body = propara.terminal_parameters_list->size();
+      *msg_body = propara.terminal_parameter_list->size();
       msg_body++;
       msg.len++;
       msghead_ptr->attribute.bit.msglen = 1;
       // terminal parameters id.
-      if ((propara.terminal_parameters_list != nullptr) &&
-          !propara.terminal_parameters_list->empty()) {
-        auto termpara_it = propara.terminal_parameters_list->begin();
-        while(termpara_it != propara.terminal_parameters_list->end()) {
-          u32temp = (*termpara_it)->parameters_id;
+      if ((propara.terminal_parameter_list != nullptr) &&
+          !propara.terminal_parameter_list->empty()) {
+        auto termpara_it = propara.terminal_parameter_list->begin();
+        while(termpara_it != propara.terminal_parameter_list->end()) {
+          u32temp = (*termpara_it)->parameter_id;
           u32temp = EndianSwap32(u32temp);
           memcpy(msg_body, &u32temp, 4);
           msg_body += 4;
@@ -713,51 +713,51 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
     case UP_GETPARASPONSE:
       propara.respond_flow_num = msghead_ptr->msgflownum;
       propara.respond_id = msghead_ptr->id;
-      if (msg_body[2] != propara.terminal_parameters_list->size()) {
+      if (msg_body[2] != propara.terminal_parameter_list->size()) {
         propara.respond_result = 1;
         break;
       }
       msg_body += 3;
-      if ((propara.terminal_parameters_list != nullptr) &&
-          !propara.terminal_parameters_list->empty()) {
+      if ((propara.terminal_parameter_list != nullptr) &&
+          !propara.terminal_parameter_list->empty()) {
         stringstream ss;
-        auto termpara_it = propara.terminal_parameters_list->begin();
-        while(termpara_it != propara.terminal_parameters_list->end()) {
+        auto termpara_it = propara.terminal_parameter_list->begin();
+        while(termpara_it != propara.terminal_parameter_list->end()) {
           memcpy(&u32temp, &msg_body[0], 4);
           u32temp = EndianSwap32(u32temp);
-          if (u32temp != (*termpara_it)->parameters_id) {
+          if (u32temp != (*termpara_it)->parameter_id) {
             propara.respond_result = 1;
             return msghead_ptr->id;
           }
           msg_body += 4;
           u8temp = msg_body[0];
           msg_body++;
-          switch ((*termpara_it)->parameters_type) {
+          switch ((*termpara_it)->parameter_type) {
             case kByteType:
               memcpy(&u32temp, &msg_body[0], u8temp);
               snprintf(reinterpret_cast<char*>(
-                  (*termpara_it)->parameters_value),
-                  sizeof((*termpara_it)->parameters_value),
+                  (*termpara_it)->parameter_value),
+                  sizeof((*termpara_it)->parameter_value),
                   "%d", msg_body[0]);
               break;
             case kWordType:
               memcpy(&u16temp, &msg_body[0], u8temp);
               u16temp = EndianSwap16(u16temp);
               snprintf(reinterpret_cast<char*>(
-                  (*termpara_it)->parameters_value),
-                  sizeof((*termpara_it)->parameters_value),
+                  (*termpara_it)->parameter_value),
+                  sizeof((*termpara_it)->parameter_value),
                   "%d", u16temp);
               break;
             case kDwordType:
               memcpy(&u32temp, &msg_body[0], u8temp);
               u32temp = EndianSwap32(u32temp);
               snprintf(reinterpret_cast<char*>(
-                  (*termpara_it)->parameters_value),
-                  sizeof((*termpara_it)->parameters_value),
+                  (*termpara_it)->parameter_value),
+                  sizeof((*termpara_it)->parameter_value),
                   "%d", u32temp);
               break;
             case kStringType:
-              memcpy((*termpara_it)->parameters_value,
+              memcpy((*termpara_it)->parameter_value,
                      &msg_body[0], u8temp);
               break;
             default:
@@ -820,7 +820,452 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   return msghead_ptr->id;
 }
 
-void DealUpgradeRequest() {
+static uint8_t GetParameterTypeByParameterId(const uint32_t &para_id) {
+  switch (para_id) {
+    case GNSSPOSITIONMODE: case GNSSBAUDERATE: case GNSSOUTPUTFREQ:
+    case GNSSUPLOADWAY: case STARTUPGPS: case STARTUPCDRADIO:
+    case STARTUPNTRIPCORS: case STARTUPNTRIPSERV: case STARTUPJT808SERV:
+    case GPSLOGGGA: case GPSLOGRMC: case GPSLOGATT:
+    case CDRADIORECEIVEMODE: case CDRADIOFORMCODE: case NTRIPCORSGGAAUTHEN:
+    case NTRIPCORSGGASENDFREQ: case NTRIPSERVICEGGAAUTHEN:
+    case NTRIPSERVICEGGASENDFREQ: case JT808SERVICESENDFREQ:
+      return kByteType;
+    case CAN1UPLOADINTERVAL: case CAN2UPLOADINTERVAL: case CDRADIOWORKINGFREQ:
+    case NTRIPCORSPORT: case NTRIPSERVICEPORT: case JT808SERVICEPORT:
+      return kWordType;
+    case HEARTBEATINTERVAL: case TCPRESPONDTIMEOUT: case TCPMSGRETRANSTIMES:
+    case UDPRESPONDTIMEOUT: case UDPMSGRETRANSTIMES: case SMSRESPONDTIMEOUT:
+    case SMSMSGRETRANSTIMES: case POSITIONREPORTWAY: case POSITIONREPORTPLAN:
+    case NOTLOGINREPORTTIMEINTERVAL: case SLEEPREPORTTIMEINTERVAL:
+    case ALARMREPORTTIMEINTERVAL: case DEFTIMEREPORTTIMEINTERVAL:
+    case NOTLOGINREPORTDISTANCEINTERVAL: case SLEEPREPORTDISTANCEINTERVAL:
+    case ALARMREPORTDISTANCEINTERVAL: case DEFTIMEREPORTDISTANCEINTERVAL:
+    case INFLECTIONPOINTRETRANSANGLE: case ALARMSHIELDWORD: case ALARMSENDTXT:
+    case ALARMSHOOTSWITCH: case ALARMSHOOTSAVEFLAGS: case ALARMKEYFLAGS:
+    case MAXSPEED: case GNSSOUTPUTCOLLECTFREQ: case GNSSUPLOADSET:
+    case CAN1COLLECTINTERVAL: case CAN2COLLECTINTERVAL: case CDRADIOBAUDERATE:
+      return kDwordType;
+    case CANSPECIALSET: case NTRIPCORSIP: case NTRIPCORSUSERNAME:
+    case NTRIPCORSPASSWD: case NTRIPCORSMOUNTPOINT: case NTRIPSERVICEIP:
+    case NTRIPSERVICEUSERNAME: case NTRIPSERVICEPASSWD:
+    case NTRIPSERVICEMOUNTPOINT: case JT808SERVICEIP: case JT808SERVICEPHONENUM:
+      return kStringType;
+    default:
+      return kUnknowType;
+   }
+}
+
+static uint8_t GetParameterLengthByParameterType(const uint8_t &para_type) {
+  switch (para_type) {
+    case kByteType:
+      return 1;
+    case kWordType:
+      return 2;
+    case kDwordType:
+      return 4;
+    case kStringType:
+    case kUnknowType:
+    default:
+      return 0;
+   }
+}
+
+// Generate a node based on the parameter id and add it to the parameter list.
+void AddParameterNodeByParameterId(const uint32_t &para_id,
+                                   std::list<TerminalParameter *> *para_list) {
+  if (para_list == nullptr)
+    return ;
+
+  TerminalParameter *node = new TerminalParameter;
+  memset(node, 0x0, sizeof(*node));
+  node->parameter_id = para_id;
+  node->parameter_type = GetParameterTypeByParameterId(para_id);
+  node->parameter_len = GetParameterLengthByParameterType(
+                             node->parameter_type);
+  para_list->push_back(node);
+
+  return ;
+}
+
+template <class T>
+static void ClearListElement(std::list<T *> &list) {
+  if (list.empty())
+    return ;
+
+  auto remove_it = list.begin();
+  while (remove_it != list.end()) {
+    delete (*remove_it);
+    remove_it = list.erase(remove_it);
+  }
+
+  return ;
+}
+
+template <class T>
+static void ClearListElement(std::list<T *> *list) {
+  if (list == nullptr || list->empty())
+    return ;
+
+  auto remove_it = list->begin();
+  while (remove_it != list->end()) {
+    delete (*remove_it);
+    remove_it = list->erase(remove_it);
+  }
+
+  delete list;
+  list = nullptr;
+
+  return ;
+}
+
+int Jt808Service::DealGetStartupRequest(DeviceNode *device, char *result) {
+  int retval = 0;
+  ProtocolParameters propara;
+  MessageData msg;
+
+  memset(&msg, 0x0, sizeof(msg));
+  memset(&propara, 0x0, sizeof(propara));
+  propara.terminal_parameter_list = new std::list<TerminalParameter *>;
+
+  AddParameterNodeByParameterId(STARTUPGPS,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(STARTUPCDRADIO,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(STARTUPNTRIPCORS,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(STARTUPNTRIPSERV,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(STARTUPJT808SERV,
+                                propara.terminal_parameter_list);
+
+  Jt808FramePack(msg, DOWN_GETSPECTERMPARA, propara);
+  SendFrameData(device->socket_fd, msg);
+  while (1) {
+    memset(&msg, 0x0, sizeof(msg));
+    if (RecvFrameData(device->socket_fd, msg)) {
+      close(device->socket_fd);
+      break;
+    } else if (msg.len > 0) {
+      if (Jt808FrameParse(msg, propara) == UP_GETPARASPONSE) {
+        auto result_it = propara.terminal_parameter_list->begin();
+        uint8_t value = 0;
+        string str = "startup info:";
+        value = (*result_it)->parameter_value[0];
+        str += value == '1' ? " [gps]" : "";
+        ++result_it;
+        value = (*result_it)->parameter_value[0];
+        str += value == '1' ? " [cdradio]" : "";
+        ++result_it;
+        value = (*result_it)->parameter_value[0];
+        str += value == '1' ? " [ntrip cors]" : "";
+        ++result_it;
+        value = (*result_it)->parameter_value[0];
+        str += value == '1' ? " [ntrip servcie]" : "";
+        ++result_it;
+        value = (*result_it)->parameter_value[0];
+        str += value == '1' ? " [jt808 service]" : "";
+        str.copy(result, str.length(), 0);
+        printf("%s\n", result);
+        retval = str.length();
+        break;
+      }
+    }
+  }
+  // remove terminal parameter list after use.
+  ClearListElement(propara.terminal_parameter_list);
+
+  return retval;
+}
+
+int Jt808Service::DealGetGpsRequest(DeviceNode *device, char *result) {
+  int retval = 0;
+  ProtocolParameters propara;
+  MessageData msg;
+
+  memset(&msg, 0x0, sizeof(msg));
+  memset(&propara, 0x0, sizeof(propara));
+  propara.terminal_parameter_list = new std::list<TerminalParameter *>;
+
+  AddParameterNodeByParameterId(GPSLOGGGA,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(GPSLOGRMC,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(GPSLOGATT,
+                                propara.terminal_parameter_list);
+
+  Jt808FramePack(msg, DOWN_GETSPECTERMPARA, propara);
+  SendFrameData(device->socket_fd, msg);
+  while (1) {
+    memset(&msg, 0x0, sizeof(msg));
+    if (RecvFrameData(device->socket_fd, msg)) {
+      close(device->socket_fd);
+      break;
+    } else if (msg.len > 0) {
+      if (Jt808FrameParse(msg, propara) == UP_GETPARASPONSE) {
+        auto result_it = propara.terminal_parameter_list->begin();
+        uint8_t value = 0;
+        string str = "gps info:";
+        value = (*result_it)->parameter_value[0];
+        str += value == '1' ? " [LOGGGA]" : "";
+        ++result_it;
+        value = (*result_it)->parameter_value[0];
+        str += value == '1' ? " [LOGRMC]" : "";
+        ++result_it;
+        value = (*result_it)->parameter_value[0];
+        str += value == '1' ? " [LOGATT]" : "";
+        str.copy(result, str.length(), 0);
+        printf("%s\n", result);
+        retval = str.length();
+        break;
+      }
+    }
+  }
+  // remove terminal parameter list after use.
+  ClearListElement(propara.terminal_parameter_list);
+
+  return retval;
+}
+
+int Jt808Service::DealGetCdradioRequest(DeviceNode *device, char *result) {
+  int retval = 0;
+  ProtocolParameters propara;
+  MessageData msg;
+
+  memset(&msg, 0x0, sizeof(msg));
+  memset(&propara, 0x0, sizeof(propara));
+  propara.terminal_parameter_list = new std::list<TerminalParameter *>;
+
+  AddParameterNodeByParameterId(CDRADIOBAUDERATE,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(CDRADIOWORKINGFREQ,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(CDRADIORECEIVEMODE,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(CDRADIOFORMCODE,
+                                propara.terminal_parameter_list);
+
+  Jt808FramePack(msg, DOWN_GETSPECTERMPARA, propara);
+  SendFrameData(device->socket_fd, msg);
+  while (1) {
+    memset(&msg, 0x0, sizeof(msg));
+    if (RecvFrameData(device->socket_fd, msg)) {
+      close(device->socket_fd);
+      break;
+    } else if (msg.len > 0) {
+      if (Jt808FrameParse(msg, propara) == UP_GETPARASPONSE) {
+        string str = "cdradio info: bdrt[";
+        auto result_it = propara.terminal_parameter_list->begin();
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "],freq[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "],recvmode[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str +="],formcode[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "]";
+        str.copy(result, str.length(), 0);
+        printf("%s\n", result);
+        retval = str.length();
+        break;
+      }
+    }
+  }
+  // remove terminal parameter list after use.
+  ClearListElement(propara.terminal_parameter_list);
+
+  return retval;
+}
+
+int Jt808Service::DealGetNtripCorsRequest(DeviceNode *device, char *result) {
+  int retval = 0;
+  ProtocolParameters propara;
+  MessageData msg;
+
+  memset(&msg, 0x0, sizeof(msg));
+  memset(&propara, 0x0, sizeof(propara));
+  propara.terminal_parameter_list = new std::list<TerminalParameter *>;
+
+  AddParameterNodeByParameterId(NTRIPCORSIP,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPCORSPORT,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPCORSUSERNAME,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPCORSPASSWD,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPCORSMOUNTPOINT,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPCORSGGAAUTHEN,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPCORSGGASENDFREQ,
+                                propara.terminal_parameter_list);
+
+  Jt808FramePack(msg, DOWN_GETSPECTERMPARA, propara);
+  SendFrameData(device->socket_fd, msg);
+  while (1) {
+    memset(&msg, 0x0, sizeof(msg));
+    if (RecvFrameData(device->socket_fd, msg)) {
+      close(device->socket_fd);
+      break;
+    } else if (msg.len > 0) {
+      if (Jt808FrameParse(msg, propara) == UP_GETPARASPONSE) {
+        string str = "ntrip cors info: ip[";
+        auto result_it = propara.terminal_parameter_list->begin();
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "],port[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "],username[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str +="],password[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str +="],mountpoint[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        ++result_it;
+        uint8_t value = (*result_it)->parameter_value[0];
+        str += value == '1' ? "],[GGAAUTHEN" : "";
+        str +="],sendfreq[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "]";
+        str.copy(result, str.length(), 0);
+        printf("%s\n", result);
+        retval = str.length();
+        break;
+      }
+    }
+  }
+  // remove terminal parameter list after use.
+  ClearListElement(propara.terminal_parameter_list);
+
+  return retval;
+}
+
+int Jt808Service::DealGetNtripServiceRequest(DeviceNode *device, char *result) {
+  int retval = 0;
+  ProtocolParameters propara;
+  MessageData msg;
+
+  memset(&msg, 0x0, sizeof(msg));
+  memset(&propara, 0x0, sizeof(propara));
+  propara.terminal_parameter_list = new std::list<TerminalParameter *>;
+
+  AddParameterNodeByParameterId(NTRIPSERVICEIP,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPSERVICEPORT,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPSERVICEUSERNAME,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPSERVICEPASSWD,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPSERVICEMOUNTPOINT,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPSERVICEGGAAUTHEN,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(NTRIPSERVICEGGASENDFREQ,
+                                propara.terminal_parameter_list);
+
+  Jt808FramePack(msg, DOWN_GETSPECTERMPARA, propara);
+  SendFrameData(device->socket_fd, msg);
+  while (1) {
+    memset(&msg, 0x0, sizeof(msg));
+    if (RecvFrameData(device->socket_fd, msg)) {
+      close(device->socket_fd);
+      break;
+    } else if (msg.len > 0) {
+      if (Jt808FrameParse(msg, propara) == UP_GETPARASPONSE) {
+        string str = "ntrip service info: ip[";
+        auto result_it = propara.terminal_parameter_list->begin();
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "],port[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "],username[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str +="],password[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str +="],mountpoint[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        ++result_it;
+        uint8_t value = (*result_it)->parameter_value[0];
+        str += value == '1' ? "],[GGAAUTHEN" : "";
+        ++result_it;
+        str +="],sendfreq[";
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "]";
+        str.copy(result, str.length(), 0);
+        printf("%s\n", result);
+        retval = str.length();
+        break;
+      }
+    }
+  }
+  // remove terminal parameter list after use.
+  ClearListElement(propara.terminal_parameter_list);
+
+  return retval;
+}
+
+int Jt808Service::DealGetJt808ServiceRequest(DeviceNode *device, char *result) {
+  int retval = 0;
+  ProtocolParameters propara;
+  MessageData msg;
+
+  memset(&msg, 0x0, sizeof(msg));
+  memset(&propara, 0x0, sizeof(propara));
+  propara.terminal_parameter_list = new std::list<TerminalParameter *>;
+
+  AddParameterNodeByParameterId(JT808SERVICEIP,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(JT808SERVICEPORT,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(JT808SERVICEPHONENUM,
+                                propara.terminal_parameter_list);
+  AddParameterNodeByParameterId(JT808SERVICESENDFREQ,
+                                propara.terminal_parameter_list);
+
+  Jt808FramePack(msg, DOWN_GETSPECTERMPARA, propara);
+  SendFrameData(device->socket_fd, msg);
+  while (1) {
+    memset(&msg, 0x0, sizeof(msg));
+    if (RecvFrameData(device->socket_fd, msg)) {
+      close(device->socket_fd);
+      break;
+    } else if (msg.len > 0) {
+      if (Jt808FrameParse(msg, propara) == UP_GETPARASPONSE) {
+        auto result_it = propara.terminal_parameter_list->begin();
+        string str = "jt808 service info: ip[";
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "],port[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "],phone[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str +="],uploadfreq[";
+        ++result_it;
+        str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str += "]";
+        str.copy(result, str.length(), 0);
+        printf("%s\n", result);
+        retval = str.length();
+        break;
+      }
+    }
+  }
+  // remove terminal parameter list after use.
+  ClearListElement(propara.terminal_parameter_list);
+
+  return retval;
 }
 
 int Jt808Service::ParseCommand(char *command) {
@@ -837,7 +1282,7 @@ int Jt808Service::ParseCommand(char *command) {
     auto it = device_list_.begin();
     while (it != device_list_.end()) {
       phone_num = (*it)->phone_num;
-      if (command_para == phone_num) { // find.
+      if (command_para == phone_num) { // find node.
         break;
       } else {
         ++it;
@@ -875,77 +1320,21 @@ int Jt808Service::ParseCommand(char *command) {
         }
       } else if (command_para == "get") {
         EpollUnRegister(epoll_fd_, (*it)->socket_fd);
+        memset(command, 0x0, strlen(command));
         // type.
         ss >> command_para;
-        if (command_para == "jt808service") {
-          ProtocolParameters propara;
-          MessageData msg;
-          memset(&msg, 0x0, sizeof(msg));
-          memset(&propara, 0x0, sizeof(propara));
-          propara.terminal_parameters_list =
-              new std::list<TerminalParameters *>;
-          TerminalParameters *node = new TerminalParameters;
-          memset(node, 0x0, sizeof(*node));
-          node->parameters_id = JT808SERVICEIP;
-          node->parameters_type = kStringType;
-          node->parameters_len = 0;
-          propara.terminal_parameters_list->push_back(node);
-          node = new TerminalParameters;
-          memset(node, 0x0, sizeof(*node));
-          node->parameters_id = JT808SERVICEPORT;
-          node->parameters_type = kWordType;
-          node->parameters_len = 2;
-          propara.terminal_parameters_list->push_back(node);
-          node = new TerminalParameters;
-          memset(node, 0x0, sizeof(*node));
-          node->parameters_id = JT808SERVICEPHONENUM;
-          node->parameters_type = kStringType;
-          node->parameters_len = 0;
-          propara.terminal_parameters_list->push_back(node);
-          node = new TerminalParameters;
-          memset(node, 0x0, sizeof(*node));
-          node->parameters_id = JT808SERVICESENDFREQ;
-          node->parameters_type = kByteType;
-          node->parameters_len = 1;
-          propara.terminal_parameters_list->push_back(node);
-          Jt808FramePack(msg, DOWN_GETSPECTERMPARA, propara);
-          SendFrameData((*it)->socket_fd, msg);
-          while (1) {
-            memset(&msg, 0x0, sizeof(msg));
-            if (RecvFrameData((*it)->socket_fd, msg)) {
-              close((*it)->socket_fd);
-              break;
-            } else if (msg.len > 0) {
-              if (Jt808FrameParse(msg, propara) == UP_GETPARASPONSE) {
-                auto result_it = propara.terminal_parameters_list->begin();
-                memset(command, 0x0, 1024);
-                string str = "jt808info: ip[";
-                str += reinterpret_cast<char *>((*result_it)->parameters_value);
-                str += "],port[";
-                ++result_it;
-                str += reinterpret_cast<char *>((*result_it)->parameters_value);
-                str += "],phone[";
-                ++result_it;
-                str += reinterpret_cast<char *>((*result_it)->parameters_value);
-                str +="],freq[";
-                ++result_it;
-                str += reinterpret_cast<char *>((*result_it)->parameters_value);
-                str += "]";
-                str.copy(command, str.length(), 0);
-                printf("%s\n", command);
-                retval = str.length();
-                break;
-              }
-            }
-          }
-          // remove terminal parameters list after use.
-          auto remove_it = propara.terminal_parameters_list->begin();
-          while(remove_it != propara.terminal_parameters_list->end()) {
-            delete (*remove_it);
-            remove_it = propara.terminal_parameters_list->erase(remove_it);
-          }
-          delete propara.terminal_parameters_list;
-          propara.terminal_parameters_list = nullptr;
+        if (command_para == "startup") {
+          retval = DealGetStartupRequest(*it, command);
+        } else if (command_para == "gps") {
+          retval = DealGetGpsRequest(*it, command);
+        } else if (command_para == "cdradio") {
+          retval = DealGetCdradioRequest(*it, command);
+        } else if (command_para == "ntripcors") {
+          retval = DealGetNtripCorsRequest(*it, command);
+        } else if (command_para == "ntripservice") {
+          retval = DealGetNtripServiceRequest(*it, command);
+        } else if (command_para == "jt808service") {
+          retval = DealGetJt808ServiceRequest(*it, command);
         }
         EpollRegister(epoll_fd_, (*it)->socket_fd);
       }
@@ -961,13 +1350,11 @@ void Jt808Service::UpgradeHandler(void) {
   ProtocolParameters propara;
   ifstream ifs;
   char *data = nullptr;
-  uint32_t len, max_data_len;
-  decltype (device_list_.begin()) it;
-  DeviceNode *node = new DeviceNode;
+  uint32_t len;
+  uint32_t max_data_len;
 
-  memset(node, 0x0, sizeof(DeviceNode));
   if (!device_list_.empty()) {
-    it = device_list_.begin();
+    auto it = device_list_.begin();
     while (it != device_list_.end()) {
       if ((*it)->has_upgrade) {
         (*it)->has_upgrade = false;
@@ -976,81 +1363,81 @@ void Jt808Service::UpgradeHandler(void) {
         ++it;
       }
     }
-  }
 
-  if (it == device_list_.end())
-    return ;
+    if (it == device_list_.end())
+      return ;
 
-  memset(&propara, 0x0, sizeof(propara));
-  memcpy(propara.version_num,
-         (*it)->upgrade_version, strlen((*it)->upgrade_version));
-  max_data_len = 1023 - 11 - strlen((*it)->upgrade_version);
-  EpollUnRegister(epoll_fd_, (*it)->socket_fd);
-  //printf("path: %s\n", file_path);
-  ifs.open((*it)->file_path, std::ios::binary | std::ios::in);
-  if (ifs.is_open()) {
-    ifs.seekg(0, std::ios::end);
-    len = ifs.tellg();
-    ifs.seekg(0, std::ios::beg);
-    data = new char[len];
-    ifs.read(data, len);
-    ifs.close();
+    memset(&propara, 0x0, sizeof(propara));
+    memcpy(propara.version_num,
+           (*it)->upgrade_version, strlen((*it)->upgrade_version));
+    max_data_len = 1023 - 11 - strlen((*it)->upgrade_version);
+    EpollUnRegister(epoll_fd_, (*it)->socket_fd);
+    //printf("path: %s\n", file_path);
+    ifs.open((*it)->file_path, std::ios::binary | std::ios::in);
+    if (ifs.is_open()) {
+      ifs.seekg(0, std::ios::end);
+      len = ifs.tellg();
+      ifs.seekg(0, std::ios::beg);
+      data = new char[len];
+      ifs.read(data, len);
+      ifs.close();
 
-    // packet total num.
-    propara.packet_total_num = len/max_data_len + 1;
-    // packet sequence num.
-    propara.packet_sequence_num = 1;
-    // upgrade type.
-    propara.upgrade_type = (*it)->upgrade_type;
-    // upgrade version name len.
-    propara.version_num_len = strlen((*it)->upgrade_version);
-    // valid content of the upgrade file.
-    while (len > 0) {
-      memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      if (len > max_data_len)
-        propara.packet_data_len = max_data_len; // length of valid content.
-      else
-        propara.packet_data_len = len;
-      len -= propara.packet_data_len;
-      //printf("sum packet = %d, sub packet = %d\n",
-      //       propara.packet_total_num, propara.packet_sequence_num);
-      memset(propara.packet_data, 0x0, sizeof(propara.packet_data));
-      memcpy(propara.packet_data,
-             data + max_data_len * (propara.packet_sequence_num - 1),
-             propara.packet_data_len);
-      msg.len = Jt808FramePack(msg, DOWN_UPDATEPACKAGE, propara);
-      if (SendFrameData((*it)->socket_fd, msg)) {
-        close((*it)->socket_fd);
-        (*it)->socket_fd = -1;
-        break;
-      } else {
-        while (1) {
-          // watting for the terminal's response.
-          if (RecvFrameData((*it)->socket_fd, msg)) {
-            close((*it)->socket_fd);
-            (*it)->socket_fd = -1;
-            break;
-          } else if (msg.len > 0) {
-            if ((Jt808FrameParse(msg, propara) == UP_UNIRESPONSE) &&
-                (propara.respond_id == DOWN_UPDATEPACKAGE))
-              break;
-          }
-        }
-
-        if ((*it)->socket_fd == -1)
+      // packet total num.
+      propara.packet_total_num = len/max_data_len + 1;
+      // packet sequence num.
+      propara.packet_sequence_num = 1;
+      // upgrade type.
+      propara.upgrade_type = (*it)->upgrade_type;
+      // upgrade version name len.
+      propara.version_num_len = strlen((*it)->upgrade_version);
+      // valid content of the upgrade file.
+      while (len > 0) {
+        memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
+        if (len > max_data_len)
+          propara.packet_data_len = max_data_len; // length of valid content.
+        else
+          propara.packet_data_len = len;
+        len -= propara.packet_data_len;
+        //printf("sum packet = %d, sub packet = %d\n",
+        //       propara.packet_total_num, propara.packet_sequence_num);
+        memset(propara.packet_data, 0x0, sizeof(propara.packet_data));
+        memcpy(propara.packet_data,
+               data + max_data_len * (propara.packet_sequence_num - 1),
+               propara.packet_data_len);
+        msg.len = Jt808FramePack(msg, DOWN_UPDATEPACKAGE, propara);
+        if (SendFrameData((*it)->socket_fd, msg)) {
+          close((*it)->socket_fd);
+          (*it)->socket_fd = -1;
           break;
+        } else {
+          while (1) {
+            // watting for the terminal's response.
+            if (RecvFrameData((*it)->socket_fd, msg)) {
+              close((*it)->socket_fd);
+              (*it)->socket_fd = -1;
+              break;
+            } else if (msg.len > 0) {
+              if ((Jt808FrameParse(msg, propara) == UP_UNIRESPONSE) &&
+                  (propara.respond_id == DOWN_UPDATEPACKAGE))
+                break;
+            }
+          }
 
-        ++propara.packet_sequence_num;
-        usleep(1000);
+          if ((*it)->socket_fd == -1)
+            break;
+
+          ++propara.packet_sequence_num;
+          usleep(1000);
+        }
       }
-    }
 
-    if ((*it)->socket_fd > 0) {
-      EpollRegister(epoll_fd_, (*it)->socket_fd);
-    }
+      if ((*it)->socket_fd > 0) {
+        EpollRegister(epoll_fd_, (*it)->socket_fd);
+      }
 
-    delete [] data;
-    data = nullptr;
+      delete [] data;
+      data = nullptr;
+    }
   }
 
   return ;
