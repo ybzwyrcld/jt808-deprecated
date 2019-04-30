@@ -14,7 +14,7 @@
 
 using std::list;
 
-struct Node {
+struct DeviceNode {
   bool has_upgrade;
   bool upgrading;
   char phone_num[12];
@@ -56,7 +56,7 @@ public:
                      const ProtocolParameters &propara);
 
   uint16_t Jt808FrameParse(MessageData &msg, ProtocolParameters &propara);
-  int ParseCommand(const char *command);
+  int ParseCommand(char *command);
 
   // upgrade thread.
   void UpgradeHandler(void);
@@ -79,9 +79,8 @@ private:
   int client_fd_;
   std::mutex mutex_;
   uid_t uid_;
-  Node has_update_node_;
   MessageData message_;
-  list<Node> list_;
+  list<DeviceNode *> device_list_;
   char file_path[256];
   struct epoll_event *epoll_events_;
 };

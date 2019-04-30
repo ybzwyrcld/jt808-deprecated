@@ -117,7 +117,8 @@ static uint16_t UnEscape(uint8_t *data, const int &len) {
     if ((data[i] == PROTOCOL_ESCAPE) && (data[i+1] == PROTOCOL_ESCAPE_SIGN)) {
       buf[j++] = PROTOCOL_SIGN;
       ++i;
-    } else if ((data[i] == PROTOCOL_ESCAPE) && (data[i+1] == PROTOCOL_ESCAPE_ESCAPE)) {
+    } else if ((data[i] == PROTOCOL_ESCAPE) &&
+               (data[i+1] == PROTOCOL_ESCAPE_ESCAPE)) {
       buf[j++] = PROTOCOL_ESCAPE;
       ++i;
     } else {
@@ -148,38 +149,38 @@ Jt808Service::~Jt808Service() {
   }
 }
 
-static void ReadDevicesList(const char *path, list<Node> &list) {
+static void ReadDevicesList(const char *path, list<DeviceNode *> &list) {
   ifstream ifs;
   string line;
   string content;
   string::size_type spos;
   string::size_type epos;
   stringstream ss;
-  Node node;
+  DeviceNode *node;
   union {
     uint32_t value;
     uint8_t array[4];
   }code;
 
-  memset(&node, 0x0, sizeof(node));
   ifs.open(path, std::ios::binary | std::ios::in);
   if (ifs.is_open()) {
     while (getline(ifs, line)) {
-      memset(&node, 0x0, sizeof(Node));
+      node = new DeviceNode;
+      memset(node, 0x0, sizeof(DeviceNode));
       memset(&code, 0x0, sizeof(code));
       ss.clear();
       spos = 0;
       epos = line.find(";");
       content = line.substr(spos, epos - spos);
-      content.copy(node.phone_num, content.length(), 0);
+      content.copy(node->phone_num, content.length(), 0);
       ++epos;
       spos = epos;
       epos = line.find(";", spos);
       content = line.substr(spos, epos - spos);
       ss << content;
       ss >> code.value;
-      memcpy(node.authen_code, code.array, 4);
-      node.socket_fd = -1;
+      memcpy(node->authen_code, code.array, 4);
+      node->socket_fd = -1;
       list.push_back(node);
       ss.str("");
     }
@@ -219,7 +220,7 @@ bool Jt808Service::Init(const int &port, const int &sock_count) {
   epoll_fd_ = epoll_create(sock_count);
   EpollRegister(epoll_fd_, listen_sock_);
 
-  ReadDevicesList(kDevicesFilePath, list_);
+  ReadDevicesList(kDevicesFilePath, device_list_);
 
   socket_fd_ = ServerListen(kCommandInterfacePath);
   EpollRegister(epoll_fd_, socket_fd_);
@@ -258,7 +259,7 @@ bool Jt808Service::Init(const char *ip,
   epoll_fd_ = epoll_create(sock_count);
   EpollRegister(epoll_fd_, listen_sock_);
 
-  ReadDevicesList(kDevicesFilePath, list_);
+  ReadDevicesList(kDevicesFilePath, device_list_);
 
   socket_fd_ = ServerListen(kCommandInterfacePath);
   EpollRegister(epoll_fd_, socket_fd_);
@@ -269,11 +270,10 @@ bool Jt808Service::Init(const char *ip,
 int Jt808Service::AcceptNewClient(void) {
   uint16_t command = 0;
   struct sockaddr_in client_addr;
-  Node node;
   ProtocolParameters propara;
   MessageData msg;
   char phone_num[6] = {0};
-  decltype (list_.begin()) it;
+  decltype (device_list_.begin()) it;
 
   memset(&client_addr, 0, sizeof(struct sockaddr_in));
   socklen_t clilen = sizeof(struct sockaddr);
@@ -287,10 +287,12 @@ int Jt808Service::AcceptNewClient(void) {
 
   setsockopt(new_sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive));
   setsockopt(new_sock, SOL_TCP, TCP_KEEPIDLE, &keepidle, sizeof(keepidle));
-  setsockopt(new_sock, SOL_TCP, TCP_KEEPINTVL, &keepinterval, sizeof(keepinterval));
+  setsockopt(new_sock, SOL_TCP, TCP_KEEPINTVL,
+             &keepinterval, sizeof(keepinterval));
   setsockopt(new_sock, SOL_TCP, TCP_KEEPCNT, &keepcount, sizeof(keepcount));
 
   if (!RecvFrameData(new_sock, message_)) {
+    memset(&propara, 0x0, sizeof(propara));
     command = Jt808FrameParse(message_, propara);
     switch (command) {
       case UP_REGISTER:
@@ -318,22 +320,19 @@ int Jt808Service::AcceptNewClient(void) {
         if (propara.respond_result != 0x0) {
           close(new_sock);
           new_sock = -1;
-        } else if (!list_.empty()) {
-          it = list_.begin();
-          while (it != list_.end()) {
-            BcdFromStringCompress(it->phone_num,
-                                  phone_num, strlen(it->phone_num));
+        } else if (!device_list_.empty()) {
+          it = device_list_.begin();
+          while (it != device_list_.end()) {
+            BcdFromStringCompress((*it)->phone_num,
+                                  phone_num, strlen((*it)->phone_num));
             if (memcmp(phone_num, propara.phone_num, 6) == 0)
               break;
             else
               ++it;
           }
-          if (it != list_.end()) {
-            memcpy(it->manufacturer_id, propara.manufacturer_id, 5);
-            it->socket_fd = new_sock;
-            node = *it;
-            list_.erase(it);
-            list_.push_back(node);
+          if (it != device_list_.end()) {
+            memcpy((*it)->manufacturer_id, propara.manufacturer_id, 5);
+            (*it)->socket_fd = new_sock;
           }
         }
         break;
@@ -352,7 +351,6 @@ int Jt808Service::AcceptNewClient(void) {
 
 void Jt808Service::Run(const int &time_out) {
   char recv_buff[1024] = {0};
-  Node node;
   ProtocolParameters propara;
   MessageData msg;
 
@@ -375,24 +373,21 @@ void Jt808Service::Run(const int &time_out) {
         } else if (epoll_events_[i].data.fd == client_fd_) {
           memset(recv_buff, 0x0, sizeof(recv_buff));
           if ((ret = recv(client_fd_, recv_buff, sizeof(recv_buff), 0)) > 0) {
-            ParseCommand(recv_buff);
-          } else if (ret == 0) {
-            EpollUnRegister(epoll_fd_, client_fd_);
-            close(client_fd_);
+            if (ParseCommand(recv_buff) > 0)
+               send(client_fd_, recv_buff, strlen(recv_buff), 0);
           }
-        } else if ((epoll_events_[i].events & EPOLLIN) && !list_.empty()) {
-          auto it = list_.begin();
-          while (it != list_.end()) {
-            if (epoll_events_[i].data.fd == it->socket_fd) {
+          close(client_fd_);
+        } else if ((epoll_events_[i].events & EPOLLIN) &&
+                   !device_list_.empty()) {
+          auto it = device_list_.begin();
+          while (it != device_list_.end()) {
+            if (epoll_events_[i].data.fd == (*it)->socket_fd) {
               if (!RecvFrameData(epoll_events_[i].data.fd, msg)) {
                 Jt808FrameParse(msg, propara);
               } else {
                 EpollUnRegister(epoll_fd_, epoll_events_[i].data.fd);
                 close(epoll_events_[i].data.fd);
-                it->socket_fd = -1;
-                node = *it;
-                list_.erase(it);
-                list_.push_back(node);;
+                (*it)->socket_fd = -1;
               }
               break;
             } else {
@@ -526,6 +521,32 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       }
       msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
       break;
+    case DOWN_SETTERMPARA:
+      break;
+    case DOWN_GETTERMPARA:
+      break;
+    case DOWN_GETSPECTERMPARA:
+      // terminal parameters total num.
+      *msg_body = propara.terminal_parameters_list->size();
+      msg_body++;
+      msg.len++;
+      msghead_ptr->attribute.bit.msglen = 1;
+      // terminal parameters id.
+      if ((propara.terminal_parameters_list != nullptr) &&
+          !propara.terminal_parameters_list->empty()) {
+        auto termpara_it = propara.terminal_parameters_list->begin();
+        while(termpara_it != propara.terminal_parameters_list->end()) {
+          u32temp = (*termpara_it)->parameters_id;
+          u32temp = EndianSwap32(u32temp);
+          memcpy(msg_body, &u32temp, 4);
+          msg_body += 4;
+          msg.len += 4;
+          msghead_ptr->attribute.bit.msglen += 4;
+          ++termpara_it;
+        }
+      }
+      msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
+      break;
     case DOWN_UPDATEPACKAGE:
       // upgrade type.
       *msg_body = propara.upgrade_type;
@@ -582,6 +603,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   MessageHead *msghead_ptr;
   uint8_t *msg_body;
   char phone_num[12] = {0};
+  uint8_t u8temp;
   uint16_t u16temp;
   uint16_t msglen;
   uint32_t u32temp;
@@ -591,7 +613,6 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   float speed;
   float bearing;
   char timestamp[6];
-  decltype (list_.begin()) it;
 
   msg.len = UnEscape(&msg.buffer[1], msg.len);
   msghead_ptr = (MessageHead *)&msg.buffer[1];
@@ -607,61 +628,6 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   msghead_ptr->id = EndianSwap16(msghead_ptr->id);
   msglen = static_cast<uint16_t>(msghead_ptr->attribute.bit.msglen);
   switch (msghead_ptr->id) {
-    case UP_REGISTER:
-      memset(&propara, 0x0, sizeof(propara));
-      propara.respond_flow_num = msghead_ptr->msgflownum;
-      memcpy(propara.phone_num, msghead_ptr->phone, 6);
-      // check phone num.
-      if (!list_.empty()) {
-      it = list_.begin();
-        while (it != list_.end()) {
-          BcdFromStringCompress(it->phone_num,
-                                phone_num, strlen(it->phone_num));
-          if (memcmp(phone_num, msghead_ptr->phone, 6) == 0)
-            break;
-          else
-            ++it;
-        }
-        if (it != list_.end()) { // find phone num.
-          if (it->socket_fd == -1) { // make sure there is no device connection.
-            propara.respond_result = 0;
-            memcpy(propara.authen_code, it->authen_code, 4);
-            memcpy(propara.manufacturer_id, &msg_body[4], 5);
-          } else {
-            propara.respond_result = 3;
-          }
-        } else {
-          propara.respond_result = 4;
-        }
-      } else {
-        propara.respond_result = 2;
-      }
-      break;
-    case UP_AUTHENTICATION:
-      memset(&propara, 0x0, sizeof(propara));
-      propara.respond_flow_num = msghead_ptr->msgflownum;
-      propara.respond_id = msghead_ptr->id;
-      memcpy(propara.phone_num, msghead_ptr->phone, 6);
-      if (!list_.empty()) {
-        it = list_.begin();
-        while (it != list_.end()) {
-          BcdFromStringCompress(it->phone_num,
-                                phone_num, strlen(it->phone_num));
-          if (memcmp(phone_num, msghead_ptr->phone, 6) == 0)
-            break;
-          else
-            ++it;
-        }
-        if ((it != list_.end()) &&
-            (memcmp(it->authen_code, msg_body, msglen) == 0)) {
-          propara.respond_result = 0;
-        } else {
-          propara.respond_result = 1;
-        }
-      } else {
-        propara.respond_result = 1;
-      }
-      break;
     case UP_UNIRESPONSE:
       // message id.
       memcpy(&u16temp, &msg_body[2], 2);
@@ -684,6 +650,123 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
         printf("message has something wrong\r\n");
       } else if(msg_body[4] == 0x03) {
         printf("message not support\r\n");
+      }
+      break;
+    case UP_REGISTER:
+      memset(&propara, 0x0, sizeof(propara));
+      propara.respond_flow_num = msghead_ptr->msgflownum;
+      memcpy(propara.phone_num, msghead_ptr->phone, 6);
+      // check phone num.
+      if (!device_list_.empty()) {
+        auto device_it = device_list_.begin();
+        while (device_it != device_list_.end()) {
+          BcdFromStringCompress((*device_it)->phone_num,
+                                phone_num,
+                                strlen((*device_it)->phone_num));
+          if (memcmp(phone_num, msghead_ptr->phone, 6) == 0)
+            break;
+          else
+            ++device_it;
+        }
+        if (device_it != device_list_.end()) { // find phone num.
+          // make sure there is no device connection.
+          if ((*device_it)->socket_fd == -1) {
+            propara.respond_result = 0;
+            memcpy(propara.authen_code, (*device_it)->authen_code, 4);
+            memcpy(propara.manufacturer_id, &msg_body[4], 5);
+          } else {
+            propara.respond_result = 3;
+          }
+        } else {
+          propara.respond_result = 4;
+        }
+      } else {
+        propara.respond_result = 2;
+      }
+      break;
+    case UP_AUTHENTICATION:
+      memset(&propara, 0x0, sizeof(propara));
+      propara.respond_flow_num = msghead_ptr->msgflownum;
+      propara.respond_id = msghead_ptr->id;
+      memcpy(propara.phone_num, msghead_ptr->phone, 6);
+      if (!device_list_.empty()) {
+        auto device_it = device_list_.begin();
+        while (device_it != device_list_.end()) {
+          BcdFromStringCompress((*device_it)->phone_num,
+                                phone_num,
+                                strlen((*device_it)->phone_num));
+          if (memcmp(phone_num, msghead_ptr->phone, 6) == 0)
+            break;
+          else
+            ++device_it;
+        }
+        if ((device_it != device_list_.end()) &&
+            (memcmp((*device_it)->authen_code, msg_body, msglen) == 0)) {
+          propara.respond_result = 0;
+        } else {
+          propara.respond_result = 1;
+        }
+      } else {
+        propara.respond_result = 1;
+      }
+      break;
+    case UP_GETPARASPONSE:
+      propara.respond_flow_num = msghead_ptr->msgflownum;
+      propara.respond_id = msghead_ptr->id;
+      if (msg_body[2] != propara.terminal_parameters_list->size()) {
+        propara.respond_result = 1;
+        break;
+      }
+      msg_body += 3;
+      if ((propara.terminal_parameters_list != nullptr) &&
+          !propara.terminal_parameters_list->empty()) {
+        stringstream ss;
+        auto termpara_it = propara.terminal_parameters_list->begin();
+        while(termpara_it != propara.terminal_parameters_list->end()) {
+          memcpy(&u32temp, &msg_body[0], 4);
+          u32temp = EndianSwap32(u32temp);
+          if (u32temp != (*termpara_it)->parameters_id) {
+            propara.respond_result = 1;
+            return msghead_ptr->id;
+          }
+          msg_body += 4;
+          u8temp = msg_body[0];
+          msg_body++;
+          switch ((*termpara_it)->parameters_type) {
+            case kByteType:
+              memcpy(&u32temp, &msg_body[0], u8temp);
+              snprintf(reinterpret_cast<char*>(
+                  (*termpara_it)->parameters_value),
+                  sizeof((*termpara_it)->parameters_value),
+                  "%d", msg_body[0]);
+              break;
+            case kWordType:
+              memcpy(&u16temp, &msg_body[0], u8temp);
+              u16temp = EndianSwap16(u16temp);
+              snprintf(reinterpret_cast<char*>(
+                  (*termpara_it)->parameters_value),
+                  sizeof((*termpara_it)->parameters_value),
+                  "%d", u16temp);
+              break;
+            case kDwordType:
+              memcpy(&u32temp, &msg_body[0], u8temp);
+              u32temp = EndianSwap32(u32temp);
+              snprintf(reinterpret_cast<char*>(
+                  (*termpara_it)->parameters_value),
+                  sizeof((*termpara_it)->parameters_value),
+                  "%d", u32temp);
+              break;
+            case kStringType:
+              memcpy((*termpara_it)->parameters_value,
+                     &msg_body[0], u8temp);
+              break;
+            default:
+              break;
+          }
+          msg_body += u8temp;
+          ++termpara_it;
+        }
+        propara.respond_result = 0;
       }
       break;
     case UP_UPDATERESULT:
@@ -737,67 +820,140 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   return msghead_ptr->id;
 }
 
-int Jt808Service::ParseCommand(const char *command) {
+void DealUpgradeRequest() {
+}
+
+int Jt808Service::ParseCommand(char *command) {
+  int retval = 0;
   string command_para;
   string phone_num;
   stringstream ss;
-  decltype (list_.begin()) it;
 
   ss.clear();
+  ss.str("");
   ss << command;
   ss >> command_para;
-  if (command_para == "update") {
-    ss >> command_para;
-    if (!list_.empty()) {
-      it = list_.begin();
-      while (it != list_.end()) {
-        phone_num = it->phone_num;
-        if (command_para == phone_num) {
-          printf("find phone num\n");
-          break;
-        } else {
-          ++it;
-        }
+  if (!device_list_.empty()) {
+    auto it = device_list_.begin();
+    while (it != device_list_.end()) {
+      phone_num = (*it)->phone_num;
+      if (command_para == phone_num) { // find.
+        break;
+      } else {
+        ++it;
       }
-      if (it != list_.end()) {
+    }
+    if (it != device_list_.end() && ((*it)->socket_fd > 0)) {
+      ss >> command_para;
+      if (command_para == "upgrade") {
         ss >> command_para;
-        if ((command_para == "device") || (command_para == "gpsfw") ||
-            (command_para == "system") || (command_para == "cdrfw")) {
+        if ((command_para == "device") || (command_para == "gps") ||
+            (command_para == "system") || (command_para == "cdradio")) {
           if (command_para == "device")
-            it->upgrade_type = 0x0;
-          else if (command_para == "gpsfw")
-            it->upgrade_type = 0x34;
-          else if (command_para == "cdrfw")
-            it->upgrade_type = 0x35;
+            (*it)->upgrade_type = 0x0;
+          else if (command_para == "gps")
+            (*it)->upgrade_type = 0x34;
+          else if (command_para == "cdradio")
+            (*it)->upgrade_type = 0x35;
           else if (command_para == "system")
-            it->upgrade_type = 0x36;
+            (*it)->upgrade_type = 0x36;
           else
             return -1;
 
           ss >> command_para;
-          memset(it->upgrade_version, 0x0, sizeof(it->upgrade_version));
-          command_para.copy(it->upgrade_version, command_para.length(), 0);
+          memset((*it)->upgrade_version, 0x0, sizeof((*it)->upgrade_version));
+          command_para.copy((*it)->upgrade_version, command_para.length(), 0);
 
           ss >> command_para;
-          memset(it->file_path, 0x0, sizeof(it->file_path));
-          command_para.copy(it->file_path, command_para.length(), 0);
-          it->has_upgrade = true;
+          memset((*it)->file_path, 0x0, sizeof((*it)->file_path));
+          command_para.copy((*it)->file_path, command_para.length(), 0);
+          (*it)->has_upgrade = true;
 
-          Node node = *it;
-          list_.erase(it);
-          list_.push_back(node);
-
-          /* start thread. */
+          // start upgrade thread.
           std::thread start_upgrade_thread(StartUpgradeThread, this);
           start_upgrade_thread.detach();
         }
+      } else if (command_para == "get") {
+        EpollUnRegister(epoll_fd_, (*it)->socket_fd);
+        // type.
+        ss >> command_para;
+        if (command_para == "jt808service") {
+          ProtocolParameters propara;
+          MessageData msg;
+          memset(&msg, 0x0, sizeof(msg));
+          memset(&propara, 0x0, sizeof(propara));
+          propara.terminal_parameters_list =
+              new std::list<TerminalParameters *>;
+          TerminalParameters *node = new TerminalParameters;
+          memset(node, 0x0, sizeof(*node));
+          node->parameters_id = JT808SERVICEIP;
+          node->parameters_type = kStringType;
+          node->parameters_len = 0;
+          propara.terminal_parameters_list->push_back(node);
+          node = new TerminalParameters;
+          memset(node, 0x0, sizeof(*node));
+          node->parameters_id = JT808SERVICEPORT;
+          node->parameters_type = kWordType;
+          node->parameters_len = 2;
+          propara.terminal_parameters_list->push_back(node);
+          node = new TerminalParameters;
+          memset(node, 0x0, sizeof(*node));
+          node->parameters_id = JT808SERVICEPHONENUM;
+          node->parameters_type = kStringType;
+          node->parameters_len = 0;
+          propara.terminal_parameters_list->push_back(node);
+          node = new TerminalParameters;
+          memset(node, 0x0, sizeof(*node));
+          node->parameters_id = JT808SERVICESENDFREQ;
+          node->parameters_type = kByteType;
+          node->parameters_len = 1;
+          propara.terminal_parameters_list->push_back(node);
+          Jt808FramePack(msg, DOWN_GETSPECTERMPARA, propara);
+          SendFrameData((*it)->socket_fd, msg);
+          while (1) {
+            memset(&msg, 0x0, sizeof(msg));
+            if (RecvFrameData((*it)->socket_fd, msg)) {
+              close((*it)->socket_fd);
+              break;
+            } else if (msg.len > 0) {
+              if (Jt808FrameParse(msg, propara) == UP_GETPARASPONSE) {
+                auto result_it = propara.terminal_parameters_list->begin();
+                memset(command, 0x0, 1024);
+                string str = "jt808info: ip[";
+                str += reinterpret_cast<char *>((*result_it)->parameters_value);
+                str += "],port[";
+                ++result_it;
+                str += reinterpret_cast<char *>((*result_it)->parameters_value);
+                str += "],phone[";
+                ++result_it;
+                str += reinterpret_cast<char *>((*result_it)->parameters_value);
+                str +="],freq[";
+                ++result_it;
+                str += reinterpret_cast<char *>((*result_it)->parameters_value);
+                str += "]";
+                str.copy(command, str.length(), 0);
+                printf("%s\n", command);
+                retval = str.length();
+                break;
+              }
+            }
+          }
+          // remove terminal parameters list after use.
+          auto remove_it = propara.terminal_parameters_list->begin();
+          while(remove_it != propara.terminal_parameters_list->end()) {
+            delete (*remove_it);
+            remove_it = propara.terminal_parameters_list->erase(remove_it);
+          }
+          delete propara.terminal_parameters_list;
+          propara.terminal_parameters_list = nullptr;
+        }
+        EpollRegister(epoll_fd_, (*it)->socket_fd);
       }
     }
-    ss.str("");
   }
 
-
-  return 0;
+  ss.str("");
+  return retval;
 }
 
 void Jt808Service::UpgradeHandler(void) {
@@ -806,16 +962,15 @@ void Jt808Service::UpgradeHandler(void) {
   ifstream ifs;
   char *data = nullptr;
   uint32_t len, max_data_len;
-  decltype (list_.begin()) it;
-  Node node;
+  decltype (device_list_.begin()) it;
+  DeviceNode *node = new DeviceNode;
 
-  memset(&node, 0x0, sizeof(node));
-  if (!list_.empty()) {
-    it = list_.begin();
-    while (it != list_.end()) {
-      if (it->has_upgrade) {
-        node = *it;
-        list_.erase(it);
+  memset(node, 0x0, sizeof(DeviceNode));
+  if (!device_list_.empty()) {
+    it = device_list_.begin();
+    while (it != device_list_.end()) {
+      if ((*it)->has_upgrade) {
+        (*it)->has_upgrade = false;
         break;
       } else {
         ++it;
@@ -823,16 +978,16 @@ void Jt808Service::UpgradeHandler(void) {
     }
   }
 
-  if (strlen(node.phone_num) == 0)
+  if (it == device_list_.end())
     return ;
 
   memset(&propara, 0x0, sizeof(propara));
   memcpy(propara.version_num,
-         node.upgrade_version, strlen(node.upgrade_version));
-  max_data_len = 1023 - 11 - strlen(node.upgrade_version);
-  EpollUnRegister(epoll_fd_, node.socket_fd);
+         (*it)->upgrade_version, strlen((*it)->upgrade_version));
+  max_data_len = 1023 - 11 - strlen((*it)->upgrade_version);
+  EpollUnRegister(epoll_fd_, (*it)->socket_fd);
   //printf("path: %s\n", file_path);
-  ifs.open(node.file_path, std::ios::binary | std::ios::in);
+  ifs.open((*it)->file_path, std::ios::binary | std::ios::in);
   if (ifs.is_open()) {
     ifs.seekg(0, std::ios::end);
     len = ifs.tellg();
@@ -846,9 +1001,9 @@ void Jt808Service::UpgradeHandler(void) {
     // packet sequence num.
     propara.packet_sequence_num = 1;
     // upgrade type.
-    propara.upgrade_type = node.upgrade_type;
+    propara.upgrade_type = (*it)->upgrade_type;
     // upgrade version name len.
-    propara.version_num_len = strlen(node.upgrade_version);
+    propara.version_num_len = strlen((*it)->upgrade_version);
     // valid content of the upgrade file.
     while (len > 0) {
       memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
@@ -861,27 +1016,28 @@ void Jt808Service::UpgradeHandler(void) {
       //       propara.packet_total_num, propara.packet_sequence_num);
       memset(propara.packet_data, 0x0, sizeof(propara.packet_data));
       memcpy(propara.packet_data,
-             data + max_data_len * (propara.packet_sequence_num - 1), propara.packet_data_len);
+             data + max_data_len * (propara.packet_sequence_num - 1),
+             propara.packet_data_len);
       msg.len = Jt808FramePack(msg, DOWN_UPDATEPACKAGE, propara);
-      if (SendFrameData(node.socket_fd, msg)) {
-        close(node.socket_fd);
-        node.socket_fd = -1;
-        list_.push_back(node);
+      if (SendFrameData((*it)->socket_fd, msg)) {
+        close((*it)->socket_fd);
+        (*it)->socket_fd = -1;
         break;
       } else {
         while (1) {
-          if (RecvFrameData(node.socket_fd, msg)) {
-            close(node.socket_fd);
-            node.socket_fd = -1;
+          // watting for the terminal's response.
+          if (RecvFrameData((*it)->socket_fd, msg)) {
+            close((*it)->socket_fd);
+            (*it)->socket_fd = -1;
             break;
           } else if (msg.len > 0) {
             if ((Jt808FrameParse(msg, propara) == UP_UNIRESPONSE) &&
                 (propara.respond_id == DOWN_UPDATEPACKAGE))
-            break;
+              break;
           }
         }
 
-        if (node.socket_fd == -1)
+        if ((*it)->socket_fd == -1)
           break;
 
         ++propara.packet_sequence_num;
@@ -889,15 +1045,13 @@ void Jt808Service::UpgradeHandler(void) {
       }
     }
 
-    if (node.socket_fd > 0) {
-      EpollRegister(epoll_fd_, node.socket_fd);
+    if ((*it)->socket_fd > 0) {
+      EpollRegister(epoll_fd_, (*it)->socket_fd);
     }
 
     delete [] data;
     data = nullptr;
   }
-
-  list_.push_back(node);
 
   return ;
 }

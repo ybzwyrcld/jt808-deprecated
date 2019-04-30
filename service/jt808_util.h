@@ -4,18 +4,27 @@
 #include <unistd.h>
 #include <stdint.h>
 
+#include <list>
+
+#include "service/jt808_terminal_parameters.h"
+
+
 #define UP_UNIRESPONSE       0x0001  // 终端通用应答
 #define UP_HEARTBEAT         0x0002  // 终端心跳
 #define UP_REGISTER          0x0100  // 终端注册
 #define UP_LOGOUT            0x0101  // 终端注销
 #define UP_AUTHENTICATION    0x0102  // 终端鉴权
+#define UP_GETPARASPONSE     0x0104  // 查询终端参数应答
 #define UP_UPDATERESULT      0x0108  // 终端升级结果
 #define UP_POSITIONREPORT    0x0200  // 位置信息上报
 #define UP_PASSTHROUGH       0x0900  // 数据上行透传
 
 #define DOWN_UNIRESPONSE        0x8001  // 平台通用应答
-#define DOWN_UPDATEPACKAGE      0x8108  // 下发终端升级包
 #define DOWN_REGISTERRSPONSE    0x8100  // 终端注册应答
+#define DOWN_SETTERMPARA        0x8103  // 设置终端参数
+#define DOWN_GETTERMPARA        0x8104  // 查询终端参数
+#define DOWN_GETSPECTERMPARA    0x8106  // 查询指定终端参数
+#define DOWN_UPDATEPACKAGE      0x8108  // 下发终端升级包
 #define DOWN_PASSTHROUGH        0x8900  // 数据下行透传
 
 #define MSGBODY_NOPACKAGE_POS     13
@@ -34,14 +43,14 @@
 
 #define LOOP_BUFFER_SIZE       5
 
-#pragma pack(1)
+#pragma pack(push, 1)
 
 struct MessageData {
   uint8_t buffer[MAX_PROFRAMEBUF_LEN];
   int16_t len;
 };
 
-// 终端参数
+// 协议参数
 struct ProtocolParameters {
   uint8_t respond_result;
   uint8_t version_num_len;
@@ -56,6 +65,7 @@ struct ProtocolParameters {
   uint8_t authen_code[4];
   uint8_t version_num[32];
   uint8_t packet_data[1024];
+  std::list<TerminalParameters *> *terminal_parameters_list;
 };
 
 // 消息体属性
@@ -168,13 +178,13 @@ enum VichelColor {
 };
 
 struct Sim808Deal {
-   uint8_t  sim808_step;
-   uint8_t  answer_flag;
-   uint8_t  authen_flag;
-   uint16_t authen_len;
-   uint8_t  authen_buf[16];
+  uint8_t  sim808_step;
+  uint8_t  answer_flag;
+  uint8_t  authen_flag;
+  uint16_t authen_len;
+  uint8_t  authen_buf[16];
 };
 
-#pragma pack()
+#pragma pack(pop)
 
 #endif // JT808_UTIL_H

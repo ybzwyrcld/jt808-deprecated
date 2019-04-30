@@ -16,9 +16,10 @@ using std::endl;
 using std::string;
 
 static inline void PrintUsage(void) {
-  cout << "Usage: jt808-cmd [options]" << endl;
-  cout << "Options:" << endl;
-  cout << "update [phone number] [system/device/gpsfw/cdrfw] [version id] [file path]" << endl;
+  printf("Usage: jt808-command [phone num] [options]\n");
+  printf("Options:");
+  printf("get [startup/gps/cdradio/ntripcors/ntripservice/jt808service]");
+  printf("upgrade [system/device/gps/cdradio] [version id] [file path]");
 
   exit(0);
 }
@@ -26,7 +27,7 @@ static inline void PrintUsage(void) {
 int main(int argc, char **argv) {
   string command;
 
-  if (argc != 6) {
+  if (argc < 3 || argc > 7) {
     PrintUsage();
   }
 
@@ -49,7 +50,7 @@ int main(int argc, char **argv) {
     command += argv[5];
   }
 
-  cout << command << endl;
+  printf("command: %s\n", command.c_str());
 
   int fd = ClientConnect("/tmp/jt808cmd.sock");
   if (fd > 0) {
@@ -57,7 +58,7 @@ int main(int argc, char **argv) {
     if (command.find("get") != string::npos) {
       char recv_buf[1024] = {0};
       if(recv(fd, recv_buf, sizeof(recv_buf), 0) > 0)
-        printf("%s\n", recv_buf);
+        printf("result: %s\n", recv_buf);
     }
 
     close(fd);
