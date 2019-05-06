@@ -16,10 +16,16 @@ using std::endl;
 using std::string;
 
 static inline void PrintUsage(void) {
-  printf("Usage: jt808-command [phone num] [options]\n");
-  printf("Options:");
-  printf("get [startup/gps/cdradio/ntripcors/ntripservice/jt808service]");
-  printf("upgrade [system/device/gps/cdradio] [version id] [file path]");
+  printf("Usage: jt808-command phonenum [options]\n");
+  printf("Options:\n");
+  printf("get startup/gps/cdradio/ntripcors/ntripservice/jt808service\n");
+  printf("set startup [gps] [cdradio] [ntripcors] [ntripservice] [jt808service]\n");
+  printf("    gps [LOGGGA] [LOGRMC] [LOGATT]\n");
+  printf("    cdradio bdrt freqpoint recvmode formcode\n");
+  printf("    ntripcors ip port user passwd mntpoint [SENDGGA] [sendfreq]\n");
+  printf("    ntripservice ip port user passwd mntpoint [SENDGGA] [sendfreq]\n");
+  printf("    jt808service ip port phonenum sendfreq\n");
+  printf("upgrade system/device/gps/cdradio versionnum filepath\n");
 
   exit(0);
 }
@@ -27,7 +33,7 @@ static inline void PrintUsage(void) {
 int main(int argc, char **argv) {
   string command;
 
-  if (argc < 3 || argc > 7) {
+  if (argc < 4 || argc > 11) {
     PrintUsage();
   }
 
@@ -48,6 +54,31 @@ int main(int argc, char **argv) {
   if (argc >= 6) {
     command += " ";
     command += argv[5];
+  }
+
+  if (argc >= 7) {
+    command += " ";
+    command += argv[6];
+  }
+
+  if (argc >= 8) {
+    command += " ";
+    command += argv[7];
+  }
+
+  if (argc >= 9) {
+    command += " ";
+    command += argv[8];
+  }
+
+  if (argc >= 10) {
+    command += " ";
+    command += argv[9];
+  }
+
+  if (argc >= 11) {
+    command += " ";
+    command += argv[10];
   }
 
   printf("command: %s\n", command.c_str());

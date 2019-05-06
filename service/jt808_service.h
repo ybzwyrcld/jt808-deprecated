@@ -7,12 +7,12 @@
 
 #include <string>
 #include <list>
-#include <mutex>
 
 #include "service/jt808_util.h"
 #include "unix_socket/unix_socket.h"
 
 using std::list;
+using std::string;
 
 struct DeviceNode {
   bool has_upgrade;
@@ -58,11 +58,17 @@ public:
   uint16_t Jt808FrameParse(MessageData &msg, ProtocolParameters &propara);
 
   int DealGetStartupRequest(DeviceNode *device, char *result);
+  int DealSetStartupRequest(DeviceNode *device, std::list<string> &cmdpara_list);
   int DealGetGpsRequest(DeviceNode *device, char *result);
+  int DealSetGpsRequest(DeviceNode *device, std::list<string> &cmdpara_list);
   int DealGetCdradioRequest(DeviceNode *device, char *result);
+  int DealSetCdradioRequest(DeviceNode *device, std::list<string> &cmdpara_list);
   int DealGetNtripCorsRequest(DeviceNode *device, char *result);
+  int DealSetNtripCorsRequest(DeviceNode *device, std::list<string> &cmdpara_list);
   int DealGetNtripServiceRequest(DeviceNode *device, char *result);
+  int DealSetNtripServiceRequest(DeviceNode *device, std::list<string> &cmdpara_list);
   int DealGetJt808ServiceRequest(DeviceNode *device, char *result);
+  int DealSetJt808ServiceRequest(DeviceNode *device, std::list<string> &cmdpara_list);
 
   int ParseCommand(char *command);
 
@@ -85,7 +91,6 @@ private:
   int message_flow_num_;
   int socket_fd_;
   int client_fd_;
-  std::mutex mutex_;
   uid_t uid_;
   MessageData message_;
   list<DeviceNode *> device_list_;
