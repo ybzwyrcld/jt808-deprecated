@@ -165,7 +165,7 @@
 #define GPSLOGATT             0xF012
 
 // CDRadio模块
-// WORD    输出波特率
+// DWORD   输出波特率
 #define CDRADIOBAUDERATE      0xF020
 // WORD    工作频点
 #define CDRADIOWORKINGFREQ    0xF021
@@ -176,19 +176,17 @@
 
 // NTRIP 差分站
 // STRING  地址
-#define NTRIPCORSIP           0xF030
+#define NTRIPCORSIP                      0xF030
 // WORD    端口
-#define NTRIPCORSPORT         0xF031
+#define NTRIPCORSPORT                    0xF031
 // STRING  用户名
-#define NTRIPCORSUSERNAME     0xF032
+#define NTRIPCORSUSERNAME                0xF032
 // STRING  密码
-#define NTRIPCORSPASSWD       0xF033
+#define NTRIPCORSPASSWD                  0xF033
 // STRING  挂载点
-#define NTRIPCORSMOUNTPOINT   0xF034
-// BYTE    GGA认证标志
-#define NTRIPCORSGGAAUTHEN    0xF035
-// BYTE    GGA发送频率
-#define NTRIPCORSGGASENDFREQ  0xF036
+#define NTRIPCORSMOUNTPOINT              0xF034
+// BYTE    GGA汇报间隔
+#define NTRIPCORSREPORTINTERVAL          0xF035
 
 // NTRIP 后台
 // STRING  地址
@@ -201,10 +199,8 @@
 #define NTRIPSERVICEPASSWD               0xF043
 // STRING  挂载点
 #define NTRIPSERVICEMOUNTPOINT           0xF044
-// BYTE    GGA认证标志
-#define NTRIPSERVICEGGAAUTHEN            0xF045
-// BYTE    GGA发送频率
-#define NTRIPSERVICEGGASENDFREQ          0xF046
+// BYTE    GGA汇报间隔
+#define NTRIPSERVICEREPORTINTERVAL       0xF045
 
 // JT808 后台
 // STRING  地址
@@ -213,8 +209,8 @@
 #define JT808SERVICEPORT                 0xF051
 // STRING  终端手机号
 #define JT808SERVICEPHONENUM             0xF052
-// BYTE    发送频率
-#define JT808SERVICESENDFREQ             0xF053
+// BYTE    汇报间隔
+#define JT808SERVICEREPORTINTERVAL       0xF053
 
 #pragma pack(push, 1)
 

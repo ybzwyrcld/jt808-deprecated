@@ -73,7 +73,7 @@ static inline uint32_t EndianSwap32(const uint32_t &value) {
       | (value << 24);
 }
 
-static uint8_t BccCheckSum(uint8_t *src, const int &len) {
+static uint8_t BccCheckSum(const uint8_t *src, const int &len) {
     int16_t i = 0;
   uint8_t checksum = 0;
 
@@ -87,7 +87,7 @@ static uint8_t BccCheckSum(uint8_t *src, const int &len) {
 static uint16_t Escape(uint8_t *data, const int &len) {
   uint16_t i, j;
 
-  uint8_t *buf = (uint8_t *) new char[len * 2];
+  uint8_t *buf = new uint8_t[len * 2];
   memset(buf, 0x0, len * 2);
 
   for (i = 0, j = 0; i < len; ++i) {
@@ -110,8 +110,8 @@ static uint16_t Escape(uint8_t *data, const int &len) {
 static uint16_t UnEscape(uint8_t *data, const int &len) {
   uint16_t i, j;
 
-  uint8_t *buf = (uint8_t *) new char[len * 2];
-  memset(buf, 0x0, len * 2);
+  uint8_t *buf = new uint8_t[len];
+  memset(buf, 0x0, len);
 
   for (i = 0, j = 0; i < len; ++i) {
     if ((data[i] == PROTOCOL_ESCAPE) && (data[i+1] == PROTOCOL_ESCAPE_SIGN)) {
@@ -136,8 +136,6 @@ static inline void PreparePhoneNum(const char *src, uint8_t *bcd_array) {
 
   BcdFromStringCompress(src, phone_num, strlen(src));
   memcpy(bcd_array, phone_num, 6);
-
-  return ;
 }
 
 static uint8_t GetParameterTypeByParameterId(const uint32_t &para_id) {
@@ -146,9 +144,8 @@ static uint8_t GetParameterTypeByParameterId(const uint32_t &para_id) {
     case GNSSUPLOADWAY: case STARTUPGPS: case STARTUPCDRADIO:
     case STARTUPNTRIPCORS: case STARTUPNTRIPSERV: case STARTUPJT808SERV:
     case GPSLOGGGA: case GPSLOGRMC: case GPSLOGATT:
-    case CDRADIORECEIVEMODE: case CDRADIOFORMCODE: case NTRIPCORSGGAAUTHEN:
-    case NTRIPCORSGGASENDFREQ: case NTRIPSERVICEGGAAUTHEN:
-    case NTRIPSERVICEGGASENDFREQ: case JT808SERVICESENDFREQ:
+    case CDRADIORECEIVEMODE: case CDRADIOFORMCODE: case NTRIPCORSREPORTINTERVAL:
+    case NTRIPSERVICEREPORTINTERVAL: case JT808SERVICEREPORTINTERVAL:
       return kByteType;
     case CAN1UPLOADINTERVAL: case CAN2UPLOADINTERVAL: case CDRADIOWORKINGFREQ:
     case NTRIPCORSPORT: case NTRIPSERVICEPORT: case JT808SERVICEPORT:
@@ -209,10 +206,7 @@ void AddParameterNodeByParameterId(const uint32_t &para_id,
     }
     memcpy(node->parameter_value, para_value, node->parameter_len);
   }
-
   para_list->push_back(node);
-
-  return ;
 }
 
 template <class T>
@@ -225,8 +219,6 @@ static void ClearListElement(std::list<T *> &list) {
     delete (*remove_it);
     remove_it = list.erase(remove_it);
   }
-
-  return ;
 }
 
 template <class T>
@@ -242,8 +234,6 @@ static void ClearListElement(std::list<T *> *list) {
 
   delete list;
   list = nullptr;
-
-  return ;
 }
 
 Jt808Service::Jt808Service() {
@@ -301,29 +291,27 @@ static void ReadDevicesList(const char *path, list<DeviceNode *> &list) {
     }
     ifs.close();
   }
-
-  return ;
 }
 
 bool Jt808Service::Init(const int &port, const int &sock_count) {
   max_count_ = sock_count;
-  struct sockaddr_in caster_addr;
-  memset(&caster_addr, 0, sizeof(struct sockaddr_in));
-  caster_addr.sin_family = AF_INET;
-  caster_addr.sin_port = htons(port);
-  caster_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  struct sockaddr_in server_addr;
+  memset(&server_addr, 0, sizeof(struct sockaddr_in));
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_port = htons(port);
+  server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
   listen_sock_ = socket(AF_INET, SOCK_STREAM, 0);
-  if(listen_sock_ == -1) {
+  if (listen_sock_ == -1) {
     exit(1);
   }
 
-  if(bind(listen_sock_, (struct sockaddr*)&caster_addr,
-          sizeof(struct sockaddr)) == -1){
+  if (bind(listen_sock_, reinterpret_cast<struct sockaddr*>(&server_addr),
+           sizeof(struct sockaddr)) == -1) {
     exit(1);
   }
 
-  if(listen(listen_sock_, 5) == -1){
+  if (listen(listen_sock_, 5) == -1) {
     exit(1);
   }
 
@@ -357,12 +345,12 @@ bool Jt808Service::Init(const char *ip,
     exit(1);
   }
 
-  if (bind(listen_sock_, (struct sockaddr*)&server_addr,
+  if (bind(listen_sock_, reinterpret_cast<struct sockaddr*>(&server_addr),
            sizeof(struct sockaddr)) == -1) {
     exit(1);
   }
 
-  if (listen(listen_sock_, 5) == -1){
+  if (listen(listen_sock_, 5) == -1) {
     exit(1);
   }
 
@@ -393,10 +381,12 @@ int Jt808Service::AcceptNewClient(void) {
   memset(&client_addr, 0, sizeof(struct sockaddr_in));
   socklen_t clilen = sizeof(struct sockaddr);
 
-  int new_sock = accept(listen_sock_, (struct sockaddr*)&client_addr, &clilen);
+  int new_sock = accept(listen_sock_,
+                        reinterpret_cast<struct sockaddr*>(&client_addr),
+                        &clilen);
 
   int keepalive = 1;  // enable keepalive attributes.
-  int keepidle = 60;  // time out for starting detection.
+  int keepidle = 30;  // time out for starting detection.
   int keepinterval = 5;  // time interval for sending packets during detection.
   int keepcount = 3;  // max times for sending packets during detection.
 
@@ -465,17 +455,21 @@ int Jt808Service::AcceptNewClient(void) {
 }
 
 void Jt808Service::Run(const int &time_out) {
+  int ret = -1;
+  int i;
+  int active_count;
   char recv_buff[1024] = {0};
   ProtocolParameters propara;
   MessageData msg;
 
   while(1){
-    int ret = Jt808ServiceWait(time_out);
+    ret = Jt808ServiceWait(time_out);
     if(ret == 0){
       //printf("time out\n");
       continue;
     } else {
-      for (int i = 0; i < ret; i++) {
+      active_count = ret;
+      for (i = 0; i < active_count; i++) {
         if (epoll_events_[i].data.fd == listen_sock_) {
           if (epoll_events_[i].events & EPOLLIN) {
             AcceptNewClient();
@@ -488,7 +482,7 @@ void Jt808Service::Run(const int &time_out) {
         } else if (epoll_events_[i].data.fd == client_fd_) {
           memset(recv_buff, 0x0, sizeof(recv_buff));
           if ((ret = recv(client_fd_, recv_buff, sizeof(recv_buff), 0)) > 0) {
-            if (ParseCommand(recv_buff) > 0)
+            if (ParseCommand(recv_buff) >= 0)
                send(client_fd_, recv_buff, strlen(recv_buff), 0);
           }
           close(client_fd_);
@@ -625,7 +619,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       *msg_body = propara.respond_result;
       msg_body++;
       if (propara.respond_result == 0) {
-        // send authen code if success.
+        // send authen code if register success.
         memcpy(msg_body, propara.authen_code, 4);
         msg_body += 4;
         msghead_ptr->attribute.bit.msglen = 7;
@@ -670,8 +664,8 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
              break;
           }
           msg_body += (*paralist_it)->parameter_len;
-          msg.len += 5 + (*paralist_it)->parameter_len;
-          msghead_ptr->attribute.bit.msglen += 5 + (*paralist_it)->parameter_len;
+          msg.len += 5+(*paralist_it)->parameter_len;
+          msghead_ptr->attribute.bit.msglen += 5+(*paralist_it)->parameter_len;
           ++paralist_it;
         }
       } else {
@@ -746,13 +740,11 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
   msg.len++;
   msg.buffer[msg.len++] = PROTOCOL_SIGN;
 
-#if 0
-  printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
-  for (uint16_t i = 0; i < msg.len; ++i) {
-    printf("%02X ", msg.buffer[i]);
-  }
-  printf("\r\n");
-#endif
+  // printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
+  // for (uint16_t i = 0; i < msg.len; ++i) {
+  //   printf("%02X ", msg.buffer[i]);
+  // }
+  // printf("\r\n");
 
   return msg.len;
 }
@@ -888,7 +880,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
           memcpy(&u32temp, &msg_body[0], 4);
           u32temp = EndianSwap32(u32temp);
           if (u32temp != (*termpara_it)->parameter_id) {
-            propara.respond_result = 1;
+           propara.respond_result = 1;
             return msghead_ptr->id;
           }
           msg_body += 4;
@@ -1291,10 +1283,10 @@ int Jt808Service::DealGetCdradioRequest(DeviceNode *device, char *result) {
       break;
     } else if (msg.len > 0) {
       if (Jt808FrameParse(msg, propara) == UP_GETPARASPONSE) {
-        string str = "cdradio info: bdrt[";
+        string str = "cdradio info: bauderate[";
         auto result_it = propara.terminal_parameter_list->begin();
         str += reinterpret_cast<char *>((*result_it)->parameter_value);
-        str += "],freq[";
+        str += "],workfreqpoint[";
         ++result_it;
         str += reinterpret_cast<char *>((*result_it)->parameter_value);
         str += "],recvmode[";
@@ -1408,9 +1400,7 @@ int Jt808Service::DealGetNtripCorsRequest(DeviceNode *device, char *result) {
                                 propara.terminal_parameter_list, nullptr);
   AddParameterNodeByParameterId(NTRIPCORSMOUNTPOINT,
                                 propara.terminal_parameter_list, nullptr);
-  AddParameterNodeByParameterId(NTRIPCORSGGAAUTHEN,
-                                propara.terminal_parameter_list, nullptr);
-  AddParameterNodeByParameterId(NTRIPCORSGGASENDFREQ,
+  AddParameterNodeByParameterId(NTRIPCORSREPORTINTERVAL,
                                 propara.terminal_parameter_list, nullptr);
 
   PreparePhoneNum(device->phone_num, propara.phone_num);
@@ -1440,10 +1430,7 @@ int Jt808Service::DealGetNtripCorsRequest(DeviceNode *device, char *result) {
         str +="],mountpoint[";
         ++result_it;
         str += reinterpret_cast<char *>((*result_it)->parameter_value);
-        ++result_it;
-        uint8_t value = (*result_it)->parameter_value[0];
-        str += value == '1' ? "],[GGAAUTHEN" : "";
-        str +="],sendfreq[";
+        str +="],reportinterval[";
         ++result_it;
         str += reinterpret_cast<char *>((*result_it)->parameter_value);
         str += "]";
@@ -1468,7 +1455,7 @@ int Jt808Service::DealSetNtripCorsRequest(DeviceNode *device,
   string parameter;
   char value[5] = {0};
 
-  if ((cmdpara_list.size() != 5) && (cmdpara_list.size() != 7))
+  if (cmdpara_list.size() != 6)
     return -1;
 
   memset(&msg, 0x0, sizeof(msg));
@@ -1510,26 +1497,13 @@ int Jt808Service::DealSetNtripCorsRequest(DeviceNode *device,
                                 parameter.c_str());
 
   parameter = cmdpara_list.front();
-  if (parameter == "SENDGGA") {
-    value[0] = 1;
-    AddParameterNodeByParameterId(NTRIPCORSGGAAUTHEN,
-                                  propara.terminal_parameter_list, value);
-    cmdpara_list.pop_front();
-    parameter = cmdpara_list.front();
-    cmdpara_list.pop_front();
-    sscanf(parameter.c_str(), "%u", &u32val);
-    uint8_t u8val = static_cast<uint8_t>(u32val);
-    memset(value, 0x0, sizeof(value));
-    memcpy(value, &u8val, 1);
-    AddParameterNodeByParameterId(NTRIPCORSGGASENDFREQ,
-                                  propara.terminal_parameter_list, value);
-  } else {
-    memset(value, 0x0, sizeof(value));
-    AddParameterNodeByParameterId(NTRIPCORSGGAAUTHEN,
-                                  propara.terminal_parameter_list, value);
-    AddParameterNodeByParameterId(NTRIPCORSGGASENDFREQ,
-                                  propara.terminal_parameter_list, value);
-  }
+  cmdpara_list.pop_front();
+  sscanf(parameter.c_str(), "%u", &u32val);
+  uint8_t u8val = static_cast<uint8_t>(u32val);
+  memset(value, 0x0, sizeof(value));
+  memcpy(value, &u8val, 1);
+  AddParameterNodeByParameterId(NTRIPCORSREPORTINTERVAL,
+                                propara.terminal_parameter_list, value);
 
   PreparePhoneNum(device->phone_num, propara.phone_num);
   Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
@@ -1573,9 +1547,7 @@ int Jt808Service::DealGetNtripServiceRequest(DeviceNode *device, char *result) {
                                 propara.terminal_parameter_list, nullptr);
   AddParameterNodeByParameterId(NTRIPSERVICEMOUNTPOINT,
                                 propara.terminal_parameter_list, nullptr);
-  AddParameterNodeByParameterId(NTRIPSERVICEGGAAUTHEN,
-                                propara.terminal_parameter_list, nullptr);
-  AddParameterNodeByParameterId(NTRIPSERVICEGGASENDFREQ,
+  AddParameterNodeByParameterId(NTRIPSERVICEREPORTINTERVAL,
                                 propara.terminal_parameter_list, nullptr);
 
   PreparePhoneNum(device->phone_num, propara.phone_num);
@@ -1605,11 +1577,8 @@ int Jt808Service::DealGetNtripServiceRequest(DeviceNode *device, char *result) {
         str +="],mountpoint[";
         ++result_it;
         str += reinterpret_cast<char *>((*result_it)->parameter_value);
+        str +="],reportinterval[";
         ++result_it;
-        uint8_t value = (*result_it)->parameter_value[0];
-        str += value == '1' ? "],[GGAAUTHEN" : "";
-        ++result_it;
-        str +="],sendfreq[";
         str += reinterpret_cast<char *>((*result_it)->parameter_value);
         str += "]";
         str.copy(result, str.length(), 0);
@@ -1633,7 +1602,7 @@ int Jt808Service::DealSetNtripServiceRequest(DeviceNode *device,
   string parameter;
   char value[5] = {0};
 
-  if ((cmdpara_list.size() != 5) && (cmdpara_list.size() != 7))
+  if (cmdpara_list.size() != 6)
     return -1;
 
   memset(&msg, 0x0, sizeof(msg));
@@ -1675,26 +1644,13 @@ int Jt808Service::DealSetNtripServiceRequest(DeviceNode *device,
                                 parameter.c_str());
 
   parameter = cmdpara_list.front();
-  if (parameter == "SENDGGA") {
-    value[0] = 1;
-    AddParameterNodeByParameterId(NTRIPSERVICEGGAAUTHEN,
-                                    propara.terminal_parameter_list, value);
-    cmdpara_list.pop_front();
-    parameter = cmdpara_list.front();
-    cmdpara_list.pop_front();
-    sscanf(parameter.c_str(), "%u", &u32val);
-    uint8_t u8val = static_cast<uint8_t>(u32val);
-    memset(value, 0x0, sizeof(value));
-    memcpy(value, &u8val, 1);
-    AddParameterNodeByParameterId(NTRIPSERVICEGGASENDFREQ,
-                                  propara.terminal_parameter_list, value);
-  } else {
-    memset(value, 0x0, sizeof(value));
-    AddParameterNodeByParameterId(NTRIPSERVICEGGAAUTHEN,
-                                  propara.terminal_parameter_list, value);
-    AddParameterNodeByParameterId(NTRIPSERVICEGGASENDFREQ,
-                                  propara.terminal_parameter_list, value);
-  }
+  cmdpara_list.pop_front();
+  sscanf(parameter.c_str(), "%u", &u32val);
+  uint8_t u8val = static_cast<uint8_t>(u32val);
+  memset(value, 0x0, sizeof(value));
+  memcpy(value, &u8val, 1);
+  AddParameterNodeByParameterId(NTRIPSERVICEREPORTINTERVAL,
+                                propara.terminal_parameter_list, value);
 
   PreparePhoneNum(device->phone_num, propara.phone_num);
   Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
@@ -1734,7 +1690,7 @@ int Jt808Service::DealGetJt808ServiceRequest(DeviceNode *device, char *result) {
                                 propara.terminal_parameter_list, nullptr);
   AddParameterNodeByParameterId(JT808SERVICEPHONENUM,
                                 propara.terminal_parameter_list, nullptr);
-  AddParameterNodeByParameterId(JT808SERVICESENDFREQ,
+  AddParameterNodeByParameterId(JT808SERVICEREPORTINTERVAL,
                                 propara.terminal_parameter_list, nullptr);
 
   PreparePhoneNum(device->phone_num, propara.phone_num);
@@ -1758,7 +1714,7 @@ int Jt808Service::DealGetJt808ServiceRequest(DeviceNode *device, char *result) {
         str += "],phone[";
         ++result_it;
         str += reinterpret_cast<char *>((*result_it)->parameter_value);
-        str +="],uploadfreq[";
+        str +="],reportinterval[";
         ++result_it;
         str += reinterpret_cast<char *>((*result_it)->parameter_value);
         str += "]";
@@ -1818,7 +1774,7 @@ int Jt808Service::DealSetJt808ServiceRequest(DeviceNode *device,
   uint8_t u8val = static_cast<uint8_t>(u32val);
   memset(value, 0x0, sizeof(value));
   memcpy(value, &u8val, 1);
-  AddParameterNodeByParameterId(JT808SERVICESENDFREQ,
+  AddParameterNodeByParameterId(JT808SERVICEREPORTINTERVAL,
                                 propara.terminal_parameter_list, value);
 
   PreparePhoneNum(device->phone_num, propara.phone_num);
@@ -1861,12 +1817,12 @@ int Jt808Service::ParseCommand(char *command) {
       break;
     command_para_list.push_back(command_para);
   } while (1);
-
-  //auto cmdpara_it = command_para_list.begin();
-  //while (cmdpara_it != command_para_list.end()) {
-  //  printf("%s\n", cmdpara_it->c_str());
-  //  ++cmdpara_it;
-  //}
+  memset(command, 0x0, strlen(command));
+  // auto cmdpara_it = command_para_list.begin();
+  // while (cmdpara_it != command_para_list.end()) {
+  //   printf("%s\n", cmdpara_it->c_str());
+  //   ++cmdpara_it;
+  // }
 
   command_para = command_para_list.front();
   command_para_list.pop_front();
@@ -1914,10 +1870,10 @@ int Jt808Service::ParseCommand(char *command) {
           // start upgrade thread.
           std::thread start_upgrade_thread(StartUpgradeThread, this);
           start_upgrade_thread.detach();
+          memcpy(command, "complete.", 10);
         }
       } else if (command_para == "get") {
         EpollUnRegister(epoll_fd_, (*it)->socket_fd);
-        memset(command, 0x0, strlen(command));
         // type.
         command_para = command_para_list.front();
         command_para_list.pop_front();
@@ -1953,6 +1909,8 @@ int Jt808Service::ParseCommand(char *command) {
         } else if (command_para == "jt808service") {
           retval = DealSetJt808ServiceRequest(*it, command_para_list);
         }
+        if (retval == 0)
+          memcpy(command, "complete.", 10);
         EpollRegister(epoll_fd_, (*it)->socket_fd);
       }
     }
@@ -2040,10 +1998,8 @@ void Jt808Service::UpgradeHandler(void) {
                 break;
             }
           }
-
           if ((*it)->socket_fd == -1)
             break;
-
           ++propara.packet_sequence_num;
           usleep(1000);
         }
@@ -2052,12 +2008,9 @@ void Jt808Service::UpgradeHandler(void) {
       if ((*it)->socket_fd > 0) {
         EpollRegister(epoll_fd_, (*it)->socket_fd);
       }
-
       delete [] data;
       data = nullptr;
     }
   }
-
-  return ;
 }
 
