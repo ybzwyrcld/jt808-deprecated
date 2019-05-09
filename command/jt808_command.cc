@@ -16,9 +16,10 @@ using std::endl;
 using std::string;
 
 static inline void PrintUsage(void) {
-  printf("Usage: jt808-command phonenum [options]\n");
+  printf("Usage: jt808-command phonenum [options ...]\n");
   printf("Options:\n");
   printf("get startup/gps/cdradio/ntripcors/ntripservice/jt808service\n");
+  printf("    terminalparameter [parameterid ...]\n");
   printf("set startup [gps] [cdradio] [ntripcors] [ntripservice] "
                       "[jt808service]\n");
   printf("    gps [LOGGGA] [LOGRMC] [LOGATT]\n");
@@ -26,6 +27,7 @@ static inline void PrintUsage(void) {
   printf("    ntripcors ip port user passwd mntpoint reportinterval\n");
   printf("    ntripservice ip port user passwd mntpont reportinterval\n");
   printf("    jt808service ip port phonenum reportinterval\n");
+  printf("    terminalparameter [parameterid(HEX):parametervalue ...]\n");
   printf("upgrade system/device/gps/cdradio versionid filepath\n");
 
   exit(0);
@@ -33,7 +35,7 @@ static inline void PrintUsage(void) {
 
 int main(int argc, char **argv) {
   string command;
-  char recv_buf[1024] = {0};
+  char recv_buf[65536] = {0};
 
   if (argc < 4 || argc > 11) {
     PrintUsage();

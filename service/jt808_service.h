@@ -7,12 +7,14 @@
 
 #include <string>
 #include <list>
+#include <vector>
 
 #include "service/jt808_util.h"
 #include "unix_socket/unix_socket.h"
 
-using std::list;
 using std::string;
+using std::list;
+using std::vector;
 
 struct DeviceNode {
   bool has_upgrade;
@@ -22,18 +24,34 @@ struct DeviceNode {
   char manufacturer_id[5];
   char upgrade_version[12];
   char upgrade_type;
-  char file_path[128];
+  char file_path[256];
   int socket_fd;
 };
 
 class Jt808Service {
-public:
-  Jt808Service();
-  virtual ~Jt808Service();
+ public:
+  Jt808Service() {
+    listen_sock_ = 0;
+    epoll_fd_ = 0;
+    max_count_ = 0;
+    message_flow_num_ = 0;
+    epoll_events_ = nullptr;
+  }
+
+  virtual ~Jt808Service() {
+    if(listen_sock_ > 0){
+      close(listen_sock_);
+    }
+    if(epoll_fd_ > 0){
+      close(epoll_fd_);
+    }
+    device_list_.clear();
+    delete [] epoll_events_;
+  }
 
   // init service.
-  bool Init(const int &port, const int &sock_count);
-  bool Init(const char *ip, const int &port, const int &sock_count);
+  bool Init(const int &port, const int &max_count);
+  bool Init(const char *ip, const int &port, const int &max_count);
   int AcceptNewClient(void);
 
   // accept when command client connect.
@@ -57,18 +75,22 @@ public:
 
   uint16_t Jt808FrameParse(MessageData &msg, ProtocolParameters &propara);
 
-  int DealGetStartupRequest(DeviceNode *device, char *result);
-  int DealSetStartupRequest(DeviceNode *device, std::list<string> &cmdpara_list);
-  int DealGetGpsRequest(DeviceNode *device, char *result);
-  int DealSetGpsRequest(DeviceNode *device, std::list<string> &cmdpara_list);
-  int DealGetCdradioRequest(DeviceNode *device, char *result);
-  int DealSetCdradioRequest(DeviceNode *device, std::list<string> &cmdpara_list);
-  int DealGetNtripCorsRequest(DeviceNode *device, char *result);
-  int DealSetNtripCorsRequest(DeviceNode *device, std::list<string> &cmdpara_list);
-  int DealGetNtripServiceRequest(DeviceNode *device, char *result);
-  int DealSetNtripServiceRequest(DeviceNode *device, std::list<string> &cmdpara_list);
-  int DealGetJt808ServiceRequest(DeviceNode *device, char *result);
-  int DealSetJt808ServiceRequest(DeviceNode *device, std::list<string> &cmdpara_list);
+  int DealGetStartupRequest(DeviceNode &device, char *result);
+  int DealSetStartupRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealGetGpsRequest(DeviceNode &device, char *result);
+  int DealSetGpsRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealGetCdradioRequest(DeviceNode &device, char *result);
+  int DealSetCdradioRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealGetNtripCorsRequest(DeviceNode &device, char *result);
+  int DealSetNtripCorsRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealGetNtripServiceRequest(DeviceNode &device, char *result);
+  int DealSetNtripServiceRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealGetJt808ServiceRequest(DeviceNode &device, char *result);
+  int DealSetJt808ServiceRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealGetTerminalParameterRequest(DeviceNode &device,
+                                      vector<string> &va_vec, char *result);
+  int DealSetTerminalParameterRequest(DeviceNode &device,
+                                      vector<string> &va_vec);
 
   int ParseCommand(char *command);
 
@@ -77,11 +99,10 @@ public:
   static void *StartUpgradeThread(void *arg) {
     Jt808Service *_this = reinterpret_cast<Jt808Service *>(arg);
     _this->UpgradeHandler();
-
     return nullptr;
   }
 
-private:
+ private:
   const char *kDevicesFilePath = "./devices/devices.list";
   const char *kCommandInterfacePath = "/tmp/jt808cmd.sock";
 
@@ -93,7 +114,7 @@ private:
   int client_fd_;
   uid_t uid_;
   MessageData message_;
-  list<DeviceNode *> device_list_;
+  list<DeviceNode> device_list_;
   char file_path[256];
   struct epoll_event *epoll_events_;
 };

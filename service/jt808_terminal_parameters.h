@@ -226,7 +226,7 @@ struct TerminalParameter {
   uint8_t parameter_len;
   uint8_t parameter_type;
   uint32_t parameter_id;
-  uint8_t parameter_value[32];
+  uint8_t parameter_value[256];
 };
 
 #endif // JT808_TERMINAL_PARAMETERS_H
