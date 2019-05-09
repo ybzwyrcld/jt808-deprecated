@@ -1054,7 +1054,8 @@ int Jt808Service::DealSetStartupRequest(DeviceNode *device,
     AddParameterNodeByParameterId(STARTUPGPS,
                                   propara.terminal_parameter_list, value);
     cmdpara_list.pop_front();
-    parameter = cmdpara_list.front();
+    if (!cmdpara_list.empty())
+      parameter = cmdpara_list.front();
   } else {
     value[0] = 0;
     AddParameterNodeByParameterId(STARTUPGPS,
@@ -1066,7 +1067,8 @@ int Jt808Service::DealSetStartupRequest(DeviceNode *device,
     AddParameterNodeByParameterId(STARTUPCDRADIO,
                                   propara.terminal_parameter_list, value);
     cmdpara_list.pop_front();
-    parameter = cmdpara_list.front();
+    if (!cmdpara_list.empty())
+      parameter = cmdpara_list.front();
   } else {
     value[0] = 0;
     AddParameterNodeByParameterId(STARTUPCDRADIO,
@@ -1077,6 +1079,9 @@ int Jt808Service::DealSetStartupRequest(DeviceNode *device,
     value[0] = 1;
     AddParameterNodeByParameterId(STARTUPNTRIPCORS,
                                   propara.terminal_parameter_list, value);
+    cmdpara_list.pop_front();
+    if (!cmdpara_list.empty())
+      parameter = cmdpara_list.front();
   } else {
     value[0] = 0;
     AddParameterNodeByParameterId(STARTUPNTRIPCORS,
@@ -1088,7 +1093,8 @@ int Jt808Service::DealSetStartupRequest(DeviceNode *device,
     AddParameterNodeByParameterId(STARTUPNTRIPSERV,
                                   propara.terminal_parameter_list, value);
     cmdpara_list.pop_front();
-    parameter = cmdpara_list.front();
+    if (!cmdpara_list.empty())
+      parameter = cmdpara_list.front();
   } else {
     value[0] = 0;
     AddParameterNodeByParameterId(STARTUPNTRIPSERV,
@@ -1099,7 +1105,6 @@ int Jt808Service::DealSetStartupRequest(DeviceNode *device,
     value[0] = 1;
     AddParameterNodeByParameterId(STARTUPJT808SERV,
                                   propara.terminal_parameter_list, value);
-    cmdpara_list.pop_front();
   } else {
     value[0] = 0;
     AddParameterNodeByParameterId(STARTUPJT808SERV,
@@ -1199,7 +1204,8 @@ int Jt808Service::DealSetGpsRequest(DeviceNode *device,
     AddParameterNodeByParameterId(GPSLOGGGA,
                                   propara.terminal_parameter_list, value);
     cmdpara_list.pop_front();
-    parameter = cmdpara_list.front();
+    if (!cmdpara_list.empty())
+      parameter = cmdpara_list.front();
   } else {
     value[0] = 0;
     AddParameterNodeByParameterId(GPSLOGGGA,
@@ -1211,7 +1217,8 @@ int Jt808Service::DealSetGpsRequest(DeviceNode *device,
     AddParameterNodeByParameterId(GPSLOGRMC,
                                   propara.terminal_parameter_list, value);
     cmdpara_list.pop_front();
-    parameter = cmdpara_list.front();
+    if (!cmdpara_list.empty())
+      parameter = cmdpara_list.front();
   } else {
     value[0] = 0;
     AddParameterNodeByParameterId(GPSLOGRMC,

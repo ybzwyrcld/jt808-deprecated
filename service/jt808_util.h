@@ -43,8 +43,6 @@
 
 #define LOOP_BUFFER_SIZE       5
 
-#pragma pack(push, 1)
-
 struct MessageData {
   uint8_t buffer[MAX_PROFRAMEBUF_LEN];
   int16_t len;
@@ -67,6 +65,8 @@ struct ProtocolParameters {
   uint8_t packet_data[1024];
   std::list<TerminalParameter *> *terminal_parameter_list;
 };
+
+#pragma pack(push, 1)
 
 // 消息体属性
 union MessageBodyAttr {

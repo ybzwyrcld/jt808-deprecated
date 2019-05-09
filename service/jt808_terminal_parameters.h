@@ -212,8 +212,6 @@
 // BYTE    汇报间隔
 #define JT808SERVICEREPORTINTERVAL       0xF053
 
-#pragma pack(push, 1)
-
 // 参数数据类型
 enum ParametersType {
   kUnknowType = 0x0,
@@ -230,7 +228,5 @@ struct TerminalParameter {
   uint32_t parameter_id;
   uint8_t parameter_value[32];
 };
-
-#pragma pack(pop)
 
 #endif // JT808_TERMINAL_PARAMETERS_H
