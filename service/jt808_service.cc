@@ -724,8 +724,9 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   uint8_t *msg_body;
   char phone_num[12] = {0};
   uint8_t u8temp;
-  uint16_t u16temp;
   uint16_t msglen;
+  uint16_t retval;
+  uint16_t u16temp = 0;
   uint32_t u32temp;
   double latitude;
   double longitude;
@@ -752,15 +753,16 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   }
 
   msghead_ptr->msgflownum = EndianSwap16(msghead_ptr->msgflownum);
-  msghead_ptr->id = EndianSwap16(msghead_ptr->id);
+  u16temp = EndianSwap16(msghead_ptr->id);
+  retval = u16temp;
   msglen = static_cast<uint16_t>(msghead_ptr->attribute.bit.msglen);
-  switch (msghead_ptr->id) {
+  switch (u16temp) {
     case UP_UNIRESPONSE:
       // message id.
+      u16temp = 0;
       memcpy(&u16temp, &msg_body[2], 2);
-      u16temp = EndianSwap16(u16temp);
-      memcpy(&propara.respond_id, &u16temp, 2);
-      switch(u16temp) {
+      propara.respond_id = EndianSwap16(u16temp);
+      switch(propara.respond_id) {
         case DOWN_UPDATEPACKAGE:
           printf("%s[%d]: received updatepackage respond: ",
                  __FILE__, __LINE__);
@@ -785,7 +787,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       break;
     case UP_REGISTER:
       memset(&propara, 0x0, sizeof(propara));
-      propara.respond_flow_num = msghead_ptr->msgflownum;
+      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
       memcpy(propara.phone_num, msghead_ptr->phone, 6);
       // check phone num.
       if (!device_list_.empty()) {
@@ -817,8 +819,8 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       break;
     case UP_AUTHENTICATION:
       memset(&propara, 0x0, sizeof(propara));
-      propara.respond_flow_num = msghead_ptr->msgflownum;
-      propara.respond_id = msghead_ptr->id;
+      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
+      propara.respond_id = EndianSwap16(msghead_ptr->id);
       memcpy(propara.phone_num, msghead_ptr->phone, 6);
       if (!device_list_.empty()) {
         auto device_it = device_list_.begin();
@@ -842,8 +844,9 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       }
       break;
     case UP_GETPARASPONSE:
-      propara.respond_flow_num = msghead_ptr->msgflownum;
-      propara.respond_id = msghead_ptr->id;
+      printf("%s[%d]: received get terminalparameter respond\n", __FILE__, __LINE__);
+      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
+      propara.respond_id = EndianSwap16(msghead_ptr->id);
       msg_body += 3;
       if ((propara.terminal_parameter_list != nullptr) &&
           !propara.terminal_parameter_list->empty()) {
@@ -853,7 +856,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
           u32temp = EndianSwap32(u32temp);
           if (u32temp != (*para_it)->parameter_id) {
             propara.respond_result = 1;
-            return msghead_ptr->id;
+            break;
           }
           msg_body += 4;
           u8temp = msg_body[0];
@@ -966,7 +969,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       break;
   }
 
-  return msghead_ptr->id;
+  return retval;
 }
 
 int Jt808Service::DealGetStartupRequest(DeviceNode &device, char *result) {
@@ -1838,6 +1841,9 @@ int Jt808Service::DealGetTerminalParameterRequest(DeviceNode &device,
               str += ",";
             }
           }
+          memset(&msg, 0x0, sizeof(msg));
+          Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
+          SendFrameData(device.socket_fd, msg);
           str.copy(result, str.size(), 0);
           break;
         }
