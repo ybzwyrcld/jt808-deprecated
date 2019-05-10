@@ -88,7 +88,7 @@ class Jt808Service {
   int DealGetJt808ServiceRequest(DeviceNode &device, char *result);
   int DealSetJt808ServiceRequest(DeviceNode &device, vector<string> &va_vec);
   int DealGetTerminalParameterRequest(DeviceNode &device,
-                                      vector<string> &va_vec, char *result);
+                                      vector<string> &va_vec);
   int DealSetTerminalParameterRequest(DeviceNode &device,
                                       vector<string> &va_vec);
 

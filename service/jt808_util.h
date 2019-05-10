@@ -55,6 +55,7 @@ struct ProtocolParameters {
   uint8_t respond_result;
   uint8_t version_num_len;
   uint8_t upgrade_type;
+  uint8_t terminal_parameter_id_count;
   uint16_t respond_flow_num;
   uint16_t respond_id;
   uint16_t packet_total_num;
@@ -66,6 +67,7 @@ struct ProtocolParameters {
   uint8_t version_num[32];
   uint8_t packet_data[1024];
   std::list<TerminalParameter *> *terminal_parameter_list;
+  uint8_t *terminal_parameter_id_buffer;
 };
 
 // 消息体属性
