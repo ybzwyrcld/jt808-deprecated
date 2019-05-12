@@ -994,95 +994,43 @@ int Jt808Service::DealGetStartupRequest(DeviceNode &device, char *result) {
   return retval;
 }
 
+static int SearchStringFormList(const vector<string> &va_vec,
+                                               const string &arg) {
+  auto va_it = va_vec.begin();
+  while (va_it != va_vec.end()) {
+    if (*va_it == arg) {
+      break;
+    }
+    ++va_it;
+  }
+  return (va_it == va_vec.end() ? 0 : 1);
+}
+
 int Jt808Service::DealSetStartupRequest(DeviceNode &device,
                                         vector<string> &va_vec) {
-  int retval = 0;
-  char value[5] = {0};
   string arg;
-  ProtocolParameters propara = {0};
-  MessageData msg = {0};
 
-  propara.terminal_parameter_list = new list<TerminalParameter *>;
-  arg = va_vec.back();
-  if (arg == "gps") {
-    value[0] = 1;
-    AddParameterNodeByParameterId(STARTUPGPS,
-                                  propara.terminal_parameter_list, value);
-    va_vec.pop_back();
-    if (!va_vec.empty())
-      arg = va_vec.back();
-  } else {
-    value[0] = 0;
-    AddParameterNodeByParameterId(STARTUPGPS,
-                                  propara.terminal_parameter_list, value);
-  }
-  if (arg == "cdradio") {
-    value[0] = 1;
-    AddParameterNodeByParameterId(STARTUPCDRADIO,
-                                  propara.terminal_parameter_list, value);
-    va_vec.pop_back();
-    if (!va_vec.empty())
-      arg = va_vec.back();
-  } else {
-    value[0] = 0;
-    AddParameterNodeByParameterId(STARTUPCDRADIO,
-                                  propara.terminal_parameter_list, value);
-  }
-  if (arg == "ntripcors") {
-    value[0] = 1;
-    AddParameterNodeByParameterId(STARTUPNTRIPCORS,
-                                  propara.terminal_parameter_list, value);
-    va_vec.pop_back();
-    if (!va_vec.empty())
-      arg = va_vec.back();
-  } else {
-    value[0] = 0;
-    AddParameterNodeByParameterId(STARTUPNTRIPCORS,
-                                  propara.terminal_parameter_list, value);
-  }
-  if (arg == "ntripservice") {
-    value[0] = 1;
-    AddParameterNodeByParameterId(STARTUPNTRIPSERV,
-                                  propara.terminal_parameter_list, value);
-    va_vec.pop_back();
-    if (!va_vec.empty())
-      arg = va_vec.back();
-  } else {
-    value[0] = 0;
-    AddParameterNodeByParameterId(STARTUPNTRIPSERV,
-                                  propara.terminal_parameter_list, value);
-  }
-  if (arg == "jt808service") {
-    value[0] = 1;
-    AddParameterNodeByParameterId(STARTUPJT808SERV,
-                                  propara.terminal_parameter_list, value);
-  } else {
-    value[0] = 0;
-    AddParameterNodeByParameterId(STARTUPJT808SERV,
-                                  propara.terminal_parameter_list, value);
-  }
+  vector<string> va_vec_old(va_vec.begin(), va_vec.end());
+  va_vec.clear();
+  arg = "F000:";
+  arg += std::to_string(SearchStringFormList(va_vec_old, "gps"));
+  va_vec.push_back(arg);
+  arg = "F001:";
+  arg += std::to_string(SearchStringFormList(va_vec_old, "cdradio"));
+  va_vec.push_back(arg);
+  arg = "F002:";
+  arg += std::to_string(SearchStringFormList(va_vec_old, "ntripcors"));
+  va_vec.push_back(arg);
+  arg = "F003:";
+  arg += std::to_string(SearchStringFormList(va_vec_old, "ntripservice"));
+  va_vec.push_back(arg);
+  arg = "F004:";
+  arg += std::to_string(SearchStringFormList(va_vec_old, "jt808service"));
+  va_vec.push_back(arg);
 
-  PreparePhoneNum(device.phone_num, propara.phone_num);
-  Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
-  SendFrameData(device.socket_fd, msg);
-  while (1) {
-    memset(&msg, 0x0, sizeof(msg));
-    if (RecvFrameData(device.socket_fd, msg)) {
-      close(device.socket_fd);
-      device.socket_fd = -1;
-      retval = -1;
-      break;
-    } else if (msg.len > 0) {
-      if (Jt808FrameParse(msg, propara) &&
-          (propara.respond_id == DOWN_SETTERMPARA)) {
-        break;
-      }
-    }
-  }
-  // remove terminal parameter list after use.
-  ClearListElement(propara.terminal_parameter_list);
-
-  return retval;
+  va_vec_old.clear();
+  reverse(va_vec.begin(), va_vec.end());
+  return DealSetTerminalParameterRequest(device, va_vec);
 }
 
 int Jt808Service::DealGetGpsRequest(DeviceNode &device, char *result) {
@@ -1127,69 +1075,23 @@ int Jt808Service::DealGetGpsRequest(DeviceNode &device, char *result) {
 
 int Jt808Service::DealSetGpsRequest(DeviceNode &device,
                                     vector<string> &va_vec) {
-  int retval = 0;
-  char value[5] = {0};
   string arg;
-  ProtocolParameters propara = {0};
-  MessageData msg = {0};
 
-  propara.terminal_parameter_list = new list<TerminalParameter *>;
-  arg = va_vec.back();
-  if (arg == "LOGGGA") {
-    value[0] = 1;
-    AddParameterNodeByParameterId(GPSLOGGGA,
-                                  propara.terminal_parameter_list, value);
-    va_vec.pop_back();
-    if (!va_vec.empty())
-      arg = va_vec.back();
-  } else {
-    value[0] = 0;
-    AddParameterNodeByParameterId(GPSLOGGGA,
-                                  propara.terminal_parameter_list, value);
-  }
-  if (arg == "LOGRMC") {
-    value[0] = 1;
-    AddParameterNodeByParameterId(GPSLOGRMC,
-                                  propara.terminal_parameter_list, value);
-    va_vec.pop_back();
-    if (!va_vec.empty())
-      arg = va_vec.back();
-  } else {
-    value[0] = 0;
-    AddParameterNodeByParameterId(GPSLOGRMC,
-                                  propara.terminal_parameter_list, value);
-  }
-  if (arg == "LOGATT") {
-    value[0] = 1;
-    AddParameterNodeByParameterId(GPSLOGATT,
-                                  propara.terminal_parameter_list, value);
-  } else {
-    value[0] = 0;
-    AddParameterNodeByParameterId(GPSLOGATT,
-                                  propara.terminal_parameter_list, value);
-  }
+  vector<string> va_vec_old(va_vec.begin(), va_vec.end());
+  va_vec.clear();
+  arg = "F010:";
+  arg += std::to_string(SearchStringFormList(va_vec_old, "LOGGGA"));
+  va_vec.push_back(arg);
+  arg = "F011:";
+  arg += std::to_string(SearchStringFormList(va_vec_old, "LOGRMC"));
+  va_vec.push_back(arg);
+  arg = "F012:";
+  arg += std::to_string(SearchStringFormList(va_vec_old, "LOGATT"));
+  va_vec.push_back(arg);
 
-  PreparePhoneNum(device.phone_num, propara.phone_num);
-  Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
-  SendFrameData(device.socket_fd, msg);
-  while (1) {
-    memset(&msg, 0x0, sizeof(msg));
-    if (RecvFrameData(device.socket_fd, msg)) {
-      close(device.socket_fd);
-      device.socket_fd = -1;
-      retval = -1;
-      break;
-    } else if (msg.len > 0) {
-      if (Jt808FrameParse(msg, propara) &&
-          (propara.respond_id == DOWN_SETTERMPARA)) {
-        break;
-      }
-    }
-  }
-  // remove terminal parameter list after use.
-  ClearListElement(propara.terminal_parameter_list);
-
-  return retval;
+  va_vec_old.clear();
+  reverse(va_vec.begin(), va_vec.end());
+  return DealSetTerminalParameterRequest(device, va_vec);
 }
 
 int Jt808Service::DealGetCdradioRequest(DeviceNode &device, char *result) {
@@ -1244,68 +1146,25 @@ int Jt808Service::DealGetCdradioRequest(DeviceNode &device, char *result) {
 
 int Jt808Service::DealSetCdradioRequest(DeviceNode &device,
                                         vector<string> &va_vec) {
-  int retval = 0;
-  uint32_t u32val = 0;
-  char value[256] = {0};
-  string arg;
-  ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  char parameter_value[256] = {0};
+  uint32_t parameter_id = CDRADIOBAUDERATE;
 
   if (va_vec.size() != 4)
     return -1;
 
-  propara.terminal_parameter_list = new list<TerminalParameter *>;
-  arg = va_vec.back();
-  va_vec.pop_back();
-  sscanf(arg.c_str(), "%u", &u32val);
-  memset(value, 0x0, sizeof(value));
-  memcpy(value, &u32val, 4);
-  AddParameterNodeByParameterId(CDRADIOBAUDERATE,
-                                propara.terminal_parameter_list, value);
-  arg = va_vec.back();
-  va_vec.pop_back();
-  sscanf(arg.c_str(), "%u", &u32val);
-  uint16_t u16val = static_cast<uint16_t>(u32val);
-  memset(value, 0x0, sizeof(value));
-  memcpy(value, &u16val, 2);
-  AddParameterNodeByParameterId(CDRADIOWORKINGFREQ,
-                                propara.terminal_parameter_list, value);
-  arg = va_vec.back();
-  va_vec.pop_back();
-  sscanf(arg.c_str(), "%u", &u32val);
-  uint8_t u8val = static_cast<uint8_t>(u32val);
-  memset(value, 0x0, sizeof(value));
-  memcpy(value, &u8val, 1);
-  AddParameterNodeByParameterId(CDRADIORECEIVEMODE,
-                                propara.terminal_parameter_list, value);
-  arg = va_vec.back();
-  va_vec.pop_back();
-  sscanf(arg.c_str(), "%u", &u32val);
-  u8val = static_cast<uint8_t>(u32val);
-  memset(value, 0x0, sizeof(value));
-  memcpy(value, &u8val, 1);
-  AddParameterNodeByParameterId(CDRADIOFORMCODE,
-                                propara.terminal_parameter_list, value);
-
-  PreparePhoneNum(device.phone_num, propara.phone_num);
-  Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
-  SendFrameData(device.socket_fd, msg);
-  while (1) {
-    memset(&msg, 0x0, sizeof(msg));
-    if (RecvFrameData(device.socket_fd, msg)) {
-      close(device.socket_fd);
-      break;
-    } else if (msg.len > 0) {
-      if (Jt808FrameParse(msg, propara) &&
-          (propara.respond_id == DOWN_SETTERMPARA)) {
-        break;
-      }
-    }
+  reverse(va_vec.begin(), va_vec.end());
+  auto va_it = va_vec.begin();
+  while (va_it != va_vec.end()) {
+    memset(parameter_value, 0x0, sizeof(parameter_value));
+    snprintf(parameter_value, sizeof(parameter_value), "%04X:%s",
+             parameter_id, va_it->c_str());
+    *va_it = parameter_value;
+    ++parameter_id;
+    ++va_it;
   }
-  // remove terminal parameter list after use.
-  ClearListElement(propara.terminal_parameter_list);
 
-  return retval;
+  reverse(va_vec.begin(), va_vec.end());
+  return DealSetTerminalParameterRequest(device, va_vec);
 }
 
 int Jt808Service::DealGetNtripCorsRequest(DeviceNode &device, char *result) {
@@ -1370,75 +1229,25 @@ int Jt808Service::DealGetNtripCorsRequest(DeviceNode &device, char *result) {
 
 int Jt808Service::DealSetNtripCorsRequest(DeviceNode &device,
                                           vector<string> &va_vec) {
-  int retval = 0;
-  uint32_t u32val = 0;
-  char value[5] = {0};
-  string arg;
-  ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  char parameter_value[256] = {0};
+  uint32_t parameter_id = NTRIPCORSIP;
 
   if (va_vec.size() != 6)
     return -1;
 
-  propara.terminal_parameter_list = new list<TerminalParameter *>;
-  arg = va_vec.back();
-  va_vec.pop_back();
-  AddParameterNodeByParameterId(NTRIPCORSIP,
-                                propara.terminal_parameter_list,
-                                arg.c_str());
-  arg = va_vec.back();
-  va_vec.pop_back();
-  sscanf(arg.c_str(), "%u", &u32val);
-  uint16_t u16val = static_cast<uint16_t>(u32val);
-  memset(value, 0x0, sizeof(value));
-  memcpy(value, &u16val, 2);
-  AddParameterNodeByParameterId(NTRIPCORSPORT,
-                                propara.terminal_parameter_list, value);
-  arg = va_vec.back();
-  va_vec.pop_back();
-  AddParameterNodeByParameterId(NTRIPCORSUSERNAME,
-                                propara.terminal_parameter_list,
-                                arg.c_str());
-  arg = va_vec.back();
-  va_vec.pop_back();
-  AddParameterNodeByParameterId(NTRIPCORSPASSWD,
-                                propara.terminal_parameter_list,
-                                arg.c_str());
-  arg = va_vec.back();
-  va_vec.pop_back();
-  AddParameterNodeByParameterId(NTRIPCORSMOUNTPOINT,
-                                propara.terminal_parameter_list,
-                                arg.c_str());
-  arg = va_vec.back();
-  va_vec.pop_back();
-  sscanf(arg.c_str(), "%u", &u32val);
-  uint8_t u8val = static_cast<uint8_t>(u32val);
-  memset(value, 0x0, sizeof(value));
-  memcpy(value, &u8val, 1);
-  AddParameterNodeByParameterId(NTRIPCORSREPORTINTERVAL,
-                                propara.terminal_parameter_list, value);
-
-  PreparePhoneNum(device.phone_num, propara.phone_num);
-  Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
-  SendFrameData(device.socket_fd, msg);
-  while (1) {
-    memset(&msg, 0x0, sizeof(msg));
-    if (RecvFrameData(device.socket_fd, msg)) {
-      close(device.socket_fd);
-      device.socket_fd = -1;
-      retval = -1;
-      break;
-    } else if (msg.len > 0) {
-      if (Jt808FrameParse(msg, propara) &&
-          (propara.respond_id == DOWN_SETTERMPARA)) {
-        break;
-      }
-    }
+  reverse(va_vec.begin(), va_vec.end());
+  auto va_it = va_vec.begin();
+  while (va_it != va_vec.end()) {
+    memset(parameter_value, 0x0, sizeof(parameter_value));
+    snprintf(parameter_value, sizeof(parameter_value), "%04X:%s",
+             parameter_id, va_it->c_str());
+    *va_it = parameter_value;
+    ++parameter_id;
+    ++va_it;
   }
-  // remove terminal parameter list after use.
-  ClearListElement(propara.terminal_parameter_list);
 
-  return retval;
+  reverse(va_vec.begin(), va_vec.end());
+  return DealSetTerminalParameterRequest(device, va_vec);
 }
 
 int Jt808Service::DealGetNtripServiceRequest(DeviceNode &device, char *result) {
@@ -1503,75 +1312,25 @@ int Jt808Service::DealGetNtripServiceRequest(DeviceNode &device, char *result) {
 
 int Jt808Service::DealSetNtripServiceRequest(DeviceNode &device,
                                              vector<string> &va_vec) {
-  int retval = 0;
-  uint32_t u32val = 0;
-  char value[5] = {0};
-  string arg;
-  ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  char parameter_value[256] = {0};
+  uint32_t parameter_id = NTRIPSERVICEIP;
 
   if (va_vec.size() != 6)
     return -1;
 
-  propara.terminal_parameter_list = new list<TerminalParameter *>;
-  arg = va_vec.back();
-  va_vec.pop_back();
-  AddParameterNodeByParameterId(NTRIPSERVICEIP,
-                                propara.terminal_parameter_list,
-                                arg.c_str());
-  arg = va_vec.back();
-  va_vec.pop_back();
-  sscanf(arg.c_str(), "%u", &u32val);
-  uint16_t u16val = static_cast<uint16_t>(u32val);
-  memset(value, 0x0, sizeof(value));
-  memcpy(value, &u16val, 2);
-  AddParameterNodeByParameterId(NTRIPSERVICEPORT,
-                                propara.terminal_parameter_list, value);
-  arg = va_vec.back();
-  va_vec.pop_back();
-  AddParameterNodeByParameterId(NTRIPSERVICEUSERNAME,
-                                propara.terminal_parameter_list,
-                                arg.c_str());
-  arg = va_vec.back();
-  va_vec.pop_back();
-  AddParameterNodeByParameterId(NTRIPSERVICEPASSWD,
-                                propara.terminal_parameter_list,
-                                arg.c_str());
-  arg = va_vec.back();
-  va_vec.pop_back();
-  AddParameterNodeByParameterId(NTRIPSERVICEMOUNTPOINT,
-                                propara.terminal_parameter_list,
-                                arg.c_str());
-  arg = va_vec.back();
-  va_vec.pop_back();
-  sscanf(arg.c_str(), "%u", &u32val);
-  uint8_t u8val = static_cast<uint8_t>(u32val);
-  memset(value, 0x0, sizeof(value));
-  memcpy(value, &u8val, 1);
-  AddParameterNodeByParameterId(NTRIPSERVICEREPORTINTERVAL,
-                                propara.terminal_parameter_list, value);
-
-  PreparePhoneNum(device.phone_num, propara.phone_num);
-  Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
-  SendFrameData(device.socket_fd, msg);
-  while (1) {
-    memset(&msg, 0x0, sizeof(msg));
-    if (RecvFrameData(device.socket_fd, msg)) {
-      close(device.socket_fd);
-      device.socket_fd = -1;
-      retval = -1;
-      break;
-    } else if (msg.len > 0) {
-      if (Jt808FrameParse(msg, propara) &&
-          (propara.respond_id == DOWN_SETTERMPARA)) {
-        break;
-      }
-    }
+  reverse(va_vec.begin(), va_vec.end());
+  auto va_it = va_vec.begin();
+  while (va_it != va_vec.end()) {
+    memset(parameter_value, 0x0, sizeof(parameter_value));
+    snprintf(parameter_value, sizeof(parameter_value), "%04X:%s",
+             parameter_id, va_it->c_str());
+    *va_it = parameter_value;
+    ++parameter_id;
+    ++va_it;
   }
-  // remove terminal parameter list after use.
-  ClearListElement(propara.terminal_parameter_list);
 
-  return retval;
+  reverse(va_vec.begin(), va_vec.end());
+  return DealSetTerminalParameterRequest(device, va_vec);
 }
 
 int Jt808Service::DealGetJt808ServiceRequest(DeviceNode &device, char *result) {
@@ -1626,65 +1385,25 @@ int Jt808Service::DealGetJt808ServiceRequest(DeviceNode &device, char *result) {
 
 int Jt808Service::DealSetJt808ServiceRequest(DeviceNode &device,
                                              vector<string> &va_vec) {
-  int retval = 0;
-  uint32_t u32val = 0;
-  char value[5] = {0};
-  string arg;
-  ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  char parameter_value[256] = {0};
+  uint32_t parameter_id = JT808SERVICEIP;
 
   if (va_vec.size() != 4)
     return -1;
 
-  propara.terminal_parameter_list = new list<TerminalParameter *>;
-  arg = va_vec.back();
-  va_vec.pop_back();
-  AddParameterNodeByParameterId(JT808SERVICEIP,
-                                propara.terminal_parameter_list,
-                                arg.c_str());
-  arg = va_vec.back();
-  va_vec.pop_back();
-  sscanf(arg.c_str(), "%u", &u32val);
-  uint16_t u16val = static_cast<uint16_t>(u32val);
-  memset(value, 0x0, sizeof(value));
-  memcpy(value, &u16val, 2);
-  AddParameterNodeByParameterId(JT808SERVICEPORT,
-                                propara.terminal_parameter_list, value);
-  arg = va_vec.back();
-  va_vec.pop_back();
-  AddParameterNodeByParameterId(JT808SERVICEPHONENUM,
-                                propara.terminal_parameter_list,
-                                arg.c_str());
-  arg = va_vec.back();
-  va_vec.pop_back();
-  sscanf(arg.c_str(), "%u", &u32val);
-  uint8_t u8val = static_cast<uint8_t>(u32val);
-  memset(value, 0x0, sizeof(value));
-  memcpy(value, &u8val, 1);
-  AddParameterNodeByParameterId(JT808SERVICEREPORTINTERVAL,
-                                propara.terminal_parameter_list, value);
-
-  PreparePhoneNum(device.phone_num, propara.phone_num);
-  Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
-  SendFrameData(device.socket_fd, msg);
-  while (1) {
-    memset(&msg, 0x0, sizeof(msg));
-    if (RecvFrameData(device.socket_fd, msg)) {
-      close(device.socket_fd);
-      device.socket_fd = -1;
-      retval = -1;
-      break;
-    } else if (msg.len > 0) {
-      if (Jt808FrameParse(msg, propara) &&
-          (propara.respond_id == DOWN_SETTERMPARA)) {
-        break;
-      }
-    }
+  reverse(va_vec.begin(), va_vec.end());
+  auto va_it = va_vec.begin();
+  while (va_it != va_vec.end()) {
+    memset(parameter_value, 0x0, sizeof(parameter_value));
+    snprintf(parameter_value, sizeof(parameter_value), "%04X:%s",
+             parameter_id, va_it->c_str());
+    *va_it = parameter_value;
+    ++parameter_id;
+    ++va_it;
   }
-  // remove terminal parameter list after use.
-  ClearListElement(propara.terminal_parameter_list);
 
-  return retval;
+  reverse(va_vec.begin(), va_vec.end());
+  return DealSetTerminalParameterRequest(device, va_vec);
 }
 
 int Jt808Service::DealGetTerminalParameterRequest(DeviceNode &device,
