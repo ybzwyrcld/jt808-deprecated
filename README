@@ -1,6 +1,0 @@
-upgrade step:
-1. run service:
-  $ ./jt808-service
-2. set your device phone num is 13826539850, and connect to this service;
-3. send update commond:
-  $ ./jt808-command 13826539850 upgrade gps 20181230 /tmp/SKGPSFWPKG-Ver20181230.bin

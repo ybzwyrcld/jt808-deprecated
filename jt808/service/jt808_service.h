@@ -1,20 +1,17 @@
-#ifndef __JT808_SERVICE_H__
-#define __JT808_SERVICE_H__
+#ifndef JT808_SERVICE_JT808_SERVICE_H_
+#define JT808_SERVICE_JT808_SERVICE_H_
 
 #include <sys/types.h>
 #include <sys/epoll.h>
 #include <string.h>
 
-#include <string>
 #include <list>
+#include <string>
 #include <vector>
 
-#include "service/jt808_util.h"
+#include "service/jt808_protocol.h"
 #include "unix_socket/unix_socket.h"
 
-using std::string;
-using std::list;
-using std::vector;
 
 struct DeviceNode {
   bool has_upgrade;
@@ -28,26 +25,26 @@ struct DeviceNode {
   int socket_fd;
 };
 
+enum UniversalResponseResult {
+  kSuccess = 0x0,
+  kFailure,
+  kMessageHasWrong,
+  kNotSupport,
+  kAlarmHandlingConfirmation,
+};
+
+enum RegisterResponseResult {
+  kRegisterSuccess = 0x0,
+  kVehiclesHaveBeenRegistered,
+  kNoSuchVehicleInTheDatabase,
+  kTerminalHaveBeenRegistered,
+  kNoSuchTerminalInTheDatabase,
+};
+
 class Jt808Service {
  public:
-  Jt808Service() {
-    listen_sock_ = 0;
-    epoll_fd_ = 0;
-    max_count_ = 0;
-    message_flow_num_ = 0;
-    epoll_events_ = nullptr;
-  }
-
-  virtual ~Jt808Service() {
-    if(listen_sock_ > 0){
-      close(listen_sock_);
-    }
-    if(epoll_fd_ > 0){
-      close(epoll_fd_);
-    }
-    device_list_.clear();
-    delete [] epoll_events_;
-  }
+  Jt808Service();
+  virtual ~Jt808Service();
 
   // init service.
   bool Init(const int &port, const int &max_count);
@@ -76,21 +73,27 @@ class Jt808Service {
   uint16_t Jt808FrameParse(MessageData &msg, ProtocolParameters &propara);
 
   int DealGetStartupRequest(DeviceNode &device, char *result);
-  int DealSetStartupRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealSetStartupRequest(DeviceNode &device,
+                            std::vector<std::string> &va_vec);
   int DealGetGpsRequest(DeviceNode &device, char *result);
-  int DealSetGpsRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealSetGpsRequest(DeviceNode &device,
+                        std::vector<std::string> &va_vec);
   int DealGetCdradioRequest(DeviceNode &device, char *result);
-  int DealSetCdradioRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealSetCdradioRequest(DeviceNode &device,
+                            std::vector<std::string> &va_vec);
   int DealGetNtripCorsRequest(DeviceNode &device, char *result);
-  int DealSetNtripCorsRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealSetNtripCorsRequest(DeviceNode &device,
+                              std::vector<std::string> &va_vec);
   int DealGetNtripServiceRequest(DeviceNode &device, char *result);
-  int DealSetNtripServiceRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealSetNtripServiceRequest(DeviceNode &device,
+                                 std::vector<std::string> &va_vec);
   int DealGetJt808ServiceRequest(DeviceNode &device, char *result);
-  int DealSetJt808ServiceRequest(DeviceNode &device, vector<string> &va_vec);
+  int DealSetJt808ServiceRequest(DeviceNode &device,
+                                 std::vector<std::string> &va_vec);
   int DealGetTerminalParameterRequest(DeviceNode &device,
-                                      vector<string> &va_vec);
+                                      std::vector<std::string> &va_vec);
   int DealSetTerminalParameterRequest(DeviceNode &device,
-                                      vector<string> &va_vec);
+                                      std::vector<std::string> &va_vec);
 
   int ParseCommand(char *command);
 
@@ -114,9 +117,9 @@ class Jt808Service {
   int client_fd_;
   uid_t uid_;
   MessageData message_;
-  list<DeviceNode> device_list_;
+  std::list<DeviceNode> device_list_;
   char file_path[256];
   struct epoll_event *epoll_events_;
 };
 
-#endif // JT808_SERVICE_H
+#endif // JT808_SERVICE_JT808_SERVICE_H_

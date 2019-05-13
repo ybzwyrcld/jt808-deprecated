@@ -1,5 +1,5 @@
-#ifndef JT808_TERMINAL_PARAMETERS_H
-#define JT808_TERMINAL_PARAMETERS_H
+#ifndef JT808_SERVICE_JT808_TERMINAL_PARAMETERS_H_
+#define JT808_SERVICE_JT808_TERMINAL_PARAMETERS_H_
 
 #include <stdint.h>
 
@@ -229,4 +229,4 @@ struct TerminalParameter {
   uint8_t parameter_value[256];
 };
 
-#endif // JT808_TERMINAL_PARAMETERS_H
+#endif // JT808_SERVICE_JT808_TERMINAL_PARAMETERS_H_

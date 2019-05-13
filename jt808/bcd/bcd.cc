@@ -27,7 +27,7 @@ char *BcdFromStringCompress(const char *src, char *dst, const int &srclen) {
   }
 
   while (*src) {
-    //*ptr++ = hex2bcd((*src++ - '0')*10 + (*src++ - '0'));
+    // *ptr++ = hex2bcd((*src++ - '0')*10 + (*src++ - '0'));
     temp = *src++ - '0';
     temp *= 10;
     temp += *src++ - '0';

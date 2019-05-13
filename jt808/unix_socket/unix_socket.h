@@ -1,5 +1,5 @@
-#ifndef UNIX_SOCKET_H
-#define UNIX_SOCKET_H
+#ifndef JT808_UNIX_SOCKET_UNIX_SOCKET_H_
+#define JT808_UNIX_SOCKET_UNIX_SOCKET_H_
 
 #include <sys/types.h>
 
@@ -9,7 +9,7 @@
 #define CLI_PERM    S_IRWXU        // rwx for user only.
 
 int ServerListen(const char *name);
-int ServerAccept(int listenfd, uid_t *uidptr);
-int ClientConnect(const char *name) ;
+int ServerAccept(const int &listenfd, uid_t *uidptr);
+int ClientConnect(const char *name);
 
-#endif // UNIX_SOCKET_H
+#endif // JT808_UNIX_SOCKET_UNIX_SOCKET_H_

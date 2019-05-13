@@ -44,7 +44,7 @@ int ServerListen(const char *name) {
 
   // add all user write permission.
   snprintf(cmd, 128, "chmod a+w %s", name);
-  system(cmd);
+  retval = system(cmd);
 
   // tell kernel we're a server.
   if (listen(fd, QLEN) < 0) {
@@ -65,7 +65,7 @@ errout:
 // We also obtain the client's usr ID from the pathname
 // that it must bind before calling us.
 // Returns new fd if all ok, < 0 on error
-int ServerAccept(int listenfd, uid_t *uidptr) {
+int ServerAccept(const int &listenfd, uid_t *uidptr) {
   int clientfd;
   int len;
   int error;
