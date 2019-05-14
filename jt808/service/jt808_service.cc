@@ -550,25 +550,12 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
   msghead_ptr->id = EndianSwap16(command);
   msghead_ptr->attribute.val = 0x0000;
   msghead_ptr->attribute.bit.encrypt = 0;
-  if (propara.packet_total_num > 1) {  // need to divide the package.
-    msghead_ptr->attribute.bit.package = 1;
-    msg_body = &msg.buffer[MSGBODY_PACKAGE_POS];
-    u16val = propara.packet_total_num;
-    u16val = EndianSwap16(u16val);
-    memcpy(&msg.buffer[13], &u16val, 2);
-    u16val = propara.packet_sequence_num;
-    u16val = EndianSwap16(u16val);
-    memcpy(&msg.buffer[15], &u16val, 2);
-    msg.len = 16;
-  } else {
-    msghead_ptr->attribute.bit.package = 0;
-    msg_body = &msg.buffer[MSGBODY_NOPACKAGE_POS];
-    msg.len = 12;
-  }
-
   message_flow_num_++;
   msghead_ptr->msgflownum = EndianSwap16(message_flow_num_);
   memcpy(msghead_ptr->phone, propara.phone_num, 6);
+  msghead_ptr->attribute.bit.package = 0;
+  msg_body = &msg.buffer[MSGBODY_NOPACKAGE_POS];
+  msg.len = 12;
 
   switch (command) {
     case DOWN_UNIRESPONSE:
@@ -603,6 +590,15 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
       break;
     case DOWN_SETTERMPARA:
+      if (propara.packet_total_num > 1) {
+        msghead_ptr->attribute.bit.package = 1;
+        u16val = EndianSwap16(propara.packet_total_num);
+        memcpy(&msg.buffer[13], &u16val, 2);
+        u16val = EndianSwap16(propara.packet_sequence_num);
+        memcpy(&msg.buffer[15], &u16val, 2);
+        msg_body += 4;
+        msg.len += 4;
+      }
       if ((propara.terminal_parameter_list != nullptr) &&
           !propara.terminal_parameter_list->empty()) {
         msg_body[0] = propara.terminal_parameter_list->size();
@@ -665,6 +661,17 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
       break;
     case DOWN_UPDATEPACKAGE:
+      if (propara.packet_total_num > 1) {
+        msghead_ptr->attribute.bit.package = 1;
+        u16val = propara.packet_total_num;
+        u16val = EndianSwap16(u16val);
+        memcpy(&msg.buffer[13], &u16val, 2);
+        u16val = propara.packet_sequence_num;
+        u16val = EndianSwap16(u16val);
+        memcpy(&msg.buffer[15], &u16val, 2);
+        msg_body += 4;
+        msg.len += 4;
+      }
       *msg_body = propara.upgrade_type;
       msg_body++;
       memcpy(msg_body, propara.manufacturer_id, 5);
@@ -700,11 +707,11 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
   msg.len++;
   msg.buffer[msg.len++] = PROTOCOL_SIGN;
 
-  // printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
-  // for (uint16_t i = 0; i < msg.len; ++i) {
-  //   printf("%02X ", msg.buffer[i]);
-  // }
-  // printf("\r\n");
+  printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
+  for (uint16_t i = 0; i < msg.len; ++i) {
+    printf("%02X ", msg.buffer[i]);
+  }
+  printf("\r\n");
 
   return msg.len;
 }
@@ -714,7 +721,6 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   uint8_t *msg_body;
   char phone_num[12] = {0};
   uint8_t u8val;
-  uint16_t msglen;
   uint16_t retval;
   uint16_t u16val = 0;
   uint32_t u32val;
@@ -733,19 +739,16 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   // printf("\r\n");
 
   msg.len = UnEscape(&msg.buffer[1], msg.len);
-  msghead_ptr = (MessageHead *)&msg.buffer[1];
+  msghead_ptr = reinterpret_cast<MessageHead *>(&msg.buffer[1]);
   msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
-
   if (msghead_ptr->attribute.bit.package) {
     msg_body = &msg.buffer[MSGBODY_PACKAGE_POS];
   } else {
     msg_body = &msg.buffer[MSGBODY_NOPACKAGE_POS];
   }
 
-  msghead_ptr->msgflownum = EndianSwap16(msghead_ptr->msgflownum);
   u16val = EndianSwap16(msghead_ptr->id);
   retval = u16val;
-  msglen = static_cast<uint16_t>(msghead_ptr->attribute.bit.msglen);
   switch (u16val) {
     case UP_UNIRESPONSE:
       memcpy(&u16val, &msg_body[2], 2);
@@ -820,7 +823,8 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
           ++device_it;
         }
         if ((device_it != device_list_.end()) &&
-            (memcmp(device_it->authen_code, msg_body, msglen) == 0)) {
+            (memcmp(device_it->authen_code, msg_body,
+                    msghead_ptr->attribute.bit.msglen) == 0)) {
           propara.respond_result = kSuccess;
         } else {
           propara.respond_result = kFailure;
@@ -832,11 +836,17 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
     case UP_GETPARASPONSE:
       printf("%s[%d]: received get terminal parameter respond\n",
              __FILE__, __LINE__);
+      if (msghead_ptr->attribute.bit.package) {
+        memcpy(&u16val, &msg.buffer[13], 2);
+        propara.packet_total_num = EndianSwap16(u16val);
+        memcpy(&u16val, &msg.buffer[15], 2);
+        propara.packet_sequence_num = EndianSwap16(u16val);
+      }
       propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
       propara.respond_id = EndianSwap16(msghead_ptr->id);
       msg_body += 3;
       if (propara.terminal_parameter_list != nullptr) {
-        int len = msglen - 3;
+        int len = msghead_ptr->attribute.bit.msglen - 3;
         char parameter_value[256] ={0};
         uint32_t parameter_id = 0;
         while (len) {
@@ -1441,7 +1451,17 @@ int Jt808Service::DealGetTerminalParameterRequest(
         break;
       } else if (msg.len > 0) {
         if (Jt808FrameParse(msg, propara) == UP_GETPARASPONSE) {
-          char parameter_s[256] = {0};
+          memset(&msg, 0x0, sizeof(msg));
+          Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
+          if (SendFrameData(device.socket_fd, msg)) {
+            close(device.socket_fd);
+            device.socket_fd = -1;
+            break;
+          }
+          if (propara.packet_total_num != propara.packet_sequence_num) {
+            continue;
+          }
+          char parameter_s[512] = {0};
           auto para_it = propara.terminal_parameter_list->begin();
           while (para_it != propara.terminal_parameter_list->end()) {
             memset(parameter_s, 0x0, sizeof(parameter_s));
@@ -1460,9 +1480,6 @@ int Jt808Service::DealGetTerminalParameterRequest(
             va_vec.push_back(arg);
             ++para_it;
           }
-          memset(&msg, 0x0, sizeof(msg));
-          Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
-          SendFrameData(device.socket_fd, msg);
           reverse(va_vec.begin(), va_vec.end());
           retval = 0;
           break;
@@ -1481,64 +1498,89 @@ int Jt808Service::DealSetTerminalParameterRequest(
   char value[256] = {0};
   uint8_t u8val = 0;
   uint16_t u16val = 0;
+  uint16_t data_len = 0;
   uint32_t u32val = 0;
   uint32_t parameter_id = 0;
   std::string arg;
   ProtocolParameters propara = {0};
   MessageData msg = {0};
 
-  propara.terminal_parameter_list = new std::list<TerminalParameter *>;
-  while (!va_vec.empty()) {
-    arg = va_vec.back();
-    va_vec.pop_back();
-    memset(value, 0x0, sizeof(value));
-    sscanf(arg.c_str(), "%x:%s", &u32val, value);
-    parameter_id = u32val;
-    memset(parameter_value, 0x0, sizeof(parameter_value));
-    switch (GetParameterTypeByParameterId(parameter_id)) {
-      case kByteType:
-        u8val = atoi(value);
-        memcpy(parameter_value, &u8val, 1);
-        break;
-      case kWordType:
-        u16val = atoi(value);
-        memcpy(parameter_value, &u16val, 2);
-        break;
-      case kDwordType:
-        u32val = atoi(value);
-        memcpy(parameter_value, &u32val, 4);
-        break;
-      case kStringType:
-        memcpy(parameter_value, value, strlen(value));
-        break;
-      case kUnknowType:
-        continue;
-    }
-    AddParameterNodeIntoList(propara.terminal_parameter_list,
-                             parameter_id, parameter_value);
+  auto va_it = va_vec.begin();
+  while (va_it != va_vec.end()) {
+    data_len += 5 + va_it->size();
+    ++va_it;
   }
 
-  if (propara.terminal_parameter_list->empty()) {
-    return retval;
+  if (data_len > 1022) {
+    propara.packet_total_num = data_len/1022 + 1;
+    propara.packet_sequence_num = 1;
   }
 
-  PreparePhoneNum(device.phone_num, propara.phone_num);
-  Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
-  SendFrameData(device.socket_fd, msg);
   while (1) {
-    memset(&msg, 0x0, sizeof(msg));
-    if (RecvFrameData(device.socket_fd, msg)) {
-      close(device.socket_fd);
-      device.socket_fd = -1;
-      break;
-    } else if (msg.len > 0) {
-      if (Jt808FrameParse(msg, propara) &&
-          (propara.respond_id == DOWN_SETTERMPARA)) {
+    propara.terminal_parameter_list = new std::list<TerminalParameter *>;
+    data_len = 0;
+    while (!va_vec.empty()) {
+      arg = va_vec.back();
+      memset(value, 0x0, sizeof(value));
+      sscanf(arg.c_str(), "%x:%s", &u32val, value);
+      parameter_id = u32val;
+      memset(parameter_value, 0x0, sizeof(parameter_value));
+      switch (GetParameterTypeByParameterId(parameter_id)) {
+        case kByteType:
+          u8val = atoi(value);
+          memcpy(parameter_value, &u8val, 1);
+          break;
+        case kWordType:
+          u16val = atoi(value);
+          memcpy(parameter_value, &u16val, 2);
+          break;
+        case kDwordType:
+          u32val = atoi(value);
+          memcpy(parameter_value, &u32val, 4);
+          break;
+        case kStringType:
+          memcpy(parameter_value, value, strlen(value));
+          break;
+        case kUnknowType:
+          continue;
+      }
+      if ((data_len + 5 + strlen(value))> 1022) {
         break;
       }
+      data_len += 5 + strlen(value);
+      va_vec.pop_back();
+      AddParameterNodeIntoList(propara.terminal_parameter_list,
+                               parameter_id, parameter_value);
+    }
+
+    if (propara.terminal_parameter_list->empty()) {
+      return retval;
+    }
+
+    PreparePhoneNum(device.phone_num, propara.phone_num);
+    Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
+    SendFrameData(device.socket_fd, msg);
+    while (1) {
+      memset(&msg, 0x0, sizeof(msg));
+      if (RecvFrameData(device.socket_fd, msg)) {
+        close(device.socket_fd);
+        device.socket_fd = -1;
+        break;
+      } else if (msg.len > 0) {
+        if (Jt808FrameParse(msg, propara) &&
+            (propara.respond_id == DOWN_SETTERMPARA)) {
+          break;
+        }
+      }
+    }
+    ClearListElement(propara.terminal_parameter_list);
+    if (va_vec.empty()) {
+      break;
+    }
+    if (propara.packet_total_num > propara.packet_sequence_num) {
+      ++propara.packet_sequence_num;
     }
   }
-  ClearListElement(propara.terminal_parameter_list);
   return retval;
 }
 

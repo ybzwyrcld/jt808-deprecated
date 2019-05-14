@@ -25,22 +25,6 @@ struct DeviceNode {
   int socket_fd;
 };
 
-enum UniversalResponseResult {
-  kSuccess = 0x0,
-  kFailure,
-  kMessageHasWrong,
-  kNotSupport,
-  kAlarmHandlingConfirmation,
-};
-
-enum RegisterResponseResult {
-  kRegisterSuccess = 0x0,
-  kVehiclesHaveBeenRegistered,
-  kNoSuchVehicleInTheDatabase,
-  kTerminalHaveBeenRegistered,
-  kNoSuchTerminalInTheDatabase,
-};
-
 class Jt808Service {
  public:
   Jt808Service();

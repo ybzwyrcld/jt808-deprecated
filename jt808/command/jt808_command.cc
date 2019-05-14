@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   std::string command;
   char recv_buf[65536] = {0};
 
-  if (argc < 4 || argc > 11) {
+  if (argc < 4) {
     PrintUsage();
   }
 
@@ -44,8 +44,6 @@ int main(int argc, char **argv) {
     if (i < (argc - 1))
       command += " ";
   }
-
-  // printf("command: %s\n", command.c_str());
 
   int fd = ClientConnect("/tmp/jt808cmd.sock");
   if (fd > 0) {
