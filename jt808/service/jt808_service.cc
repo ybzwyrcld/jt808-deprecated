@@ -130,6 +130,58 @@ static inline void PreparePhoneNum(const char *src, uint8_t *bcd_array) {
   memcpy(bcd_array, phone_num, 6);
 }
 
+static void ParsePositionReport(const MessageData &msg) {
+  uint16_t u16val;
+  uint32_t u32val;
+  double latitude;
+  double longitude;
+  float altitude;
+  float speed;
+  float bearing;
+  AlarmBit alarm_bit = {0};
+  StatusBit status_bit = {0};
+  char timestamp[6];
+  char phone_num[6] = {0};
+  char device[12] = {0};
+
+  memcpy(phone_num, &msg.buffer[5], 6);
+  StringFromBcdCompress(phone_num, device, 6);
+  memcpy(&u32val, &msg.buffer[13], 4);
+  alarm_bit.value = EndianSwap32(u32val);
+  memcpy(&u32val, &msg.buffer[17], 4);
+  status_bit.value = EndianSwap32(u32val);
+  memcpy(&u32val, &msg.buffer[21], 4);
+  longitude = EndianSwap32(u32val) / 1000000.0;
+  memcpy(&u32val, &msg.buffer[25], 4);
+  latitude = EndianSwap32(u32val) / 1000000.0;
+  memcpy(&u16val, &msg.buffer[29], 2);
+  altitude = EndianSwap16(u16val);
+  memcpy(&u16val, &msg.buffer[31], 2);
+  speed = EndianSwap16(u16val) * 10.0;
+  memcpy(&u16val, &msg.buffer[33], 2);
+  bearing = EndianSwap16(u16val);
+  timestamp[0] = HexFromBcd(msg.buffer[35]);
+  timestamp[1] = HexFromBcd(msg.buffer[36]);
+  timestamp[2] = HexFromBcd(msg.buffer[37]);
+  timestamp[3] = HexFromBcd(msg.buffer[38]);
+  timestamp[4] = HexFromBcd(msg.buffer[39]);
+  timestamp[5] = HexFromBcd(msg.buffer[40]);
+  fprintf(stdout, "\tdevice: %s\n"
+                  "\talarm flags: %08X\n""\tstatus flags: %08X\n"
+                  "\tlongitude: %lf%c\n"
+                  "\tlatitude: %lf%c\n"
+                  "\taltitude: %f\n"
+                  "\tspeed: %f\n""\tbearing: %f\n"
+                  "\ttimestamp: 20%02d-%02d-%02d, %02d:%02d:%02d\n",
+          device, alarm_bit.value, status_bit.value,
+          longitude, status_bit.bit.ewlongitude == 0 ? 'E':'W',
+          latitude, status_bit.bit.snlatitude == 0 ? 'N':'S',
+          altitude,
+          speed, bearing,
+          timestamp[0], timestamp[1], timestamp[2],
+          timestamp[3], timestamp[4], timestamp[5]);
+}
+
 static uint8_t GetParameterTypeByParameterId(const uint32_t &para_id) {
   switch (para_id) {
     case GNSSPOSITIONMODE: case GNSSBAUDERATE: case GNSSOUTPUTFREQ:
@@ -736,12 +788,6 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   uint16_t retval;
   uint16_t u16val = 0;
   uint32_t u32val;
-  double latitude;
-  double longitude;
-  float altitude;
-  float speed;
-  float bearing;
-  char timestamp[6];
   MessageHead *msghead_ptr;
 
   // printf("%s[%d]: socket-recv:\n", __FILE__, __LINE__);
@@ -911,31 +957,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       printf("%s[%d]: received position report respond:\n", __FILE__, __LINE__);
       propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
       propara.respond_id = EndianSwap16(msghead_ptr->id);
-      memset(phone_num, 0x0, sizeof(phone_num));
-      StringFromBcdCompress(reinterpret_cast<char *>(msghead_ptr->phone),
-                            phone_num, 6);
-      memcpy(&u32val, &msg_body[12], 4);
-      latitude = EndianSwap32(u32val) / 1000000.0;
-      memcpy(&u32val, &msg_body[8], 4);
-      longitude = EndianSwap32(u32val) / 1000000.0;
-      memcpy(&u16val, &msg_body[16], 2);
-      altitude = EndianSwap16(u16val);
-      memcpy(&u16val, &msg_body[18], 2);
-      speed = EndianSwap16(u16val) / 10.0;
-      memcpy(&u16val, &msg_body[20], 2);
-      bearing = EndianSwap16(u16val);
-      timestamp[0] = HexFromBcd(msg_body[22]);
-      timestamp[1] = HexFromBcd(msg_body[23]);
-      timestamp[2] = HexFromBcd(msg_body[24]);
-      timestamp[3] = HexFromBcd(msg_body[25]);
-      timestamp[4] = HexFromBcd(msg_body[26]);
-      timestamp[5] = HexFromBcd(msg_body[27]);
-      fprintf(stdout, "\tdevice: %s\n""\tlatitude: %lf\n""\tlongitude: %lf\n"
-                      "\taltitude: %f\n""\tspeed: %f\n""\tbearing: %f\n"
-                      "\ttimestamp: 20%02d-%02d-%02d, %02d:%02d:%02d\n",
-              phone_num, latitude, longitude, altitude, speed, bearing,
-              timestamp[0], timestamp[1], timestamp[2],
-              timestamp[3], timestamp[4], timestamp[5]);
+      ParsePositionReport(msg);
       propara.respond_result = kSuccess;
     default:
       break;
