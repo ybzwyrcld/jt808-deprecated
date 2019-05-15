@@ -100,7 +100,7 @@ static uint16_t Escape(uint8_t *src, const int &len) {
   return j;
 }
 
-static uint16_t UnEscape(uint8_t *src, const int &len) {
+static uint16_t ReverseEscape(uint8_t *src, const int &len) {
   uint16_t i;
   uint16_t j;
   uint8_t *buffer = new uint8_t[len];
@@ -402,7 +402,7 @@ int Jt808Service::AcceptNewClient(void) {
         }
       case UP_AUTHENTICATION:
         memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-        message_.len = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
+        msg.len = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
         SendFrameData(new_sock, msg);
         if (propara.respond_result != kSuccess) {
           close(new_sock);
@@ -475,7 +475,20 @@ void Jt808Service::Run(const int &time_out) {
           while (device_it != device_list_.end()) {
             if (epoll_events_[i].data.fd == device_it->socket_fd) {
               if (!RecvFrameData(epoll_events_[i].data.fd, msg)) {
-                Jt808FrameParse(msg, propara);
+                int cmd = Jt808FrameParse(msg, propara);
+                switch (cmd) {
+                  case UP_UPDATERESULT: case UP_POSITIONREPORT:
+                    memset(msg.buffer, 0x0, sizeof(msg.buffer));
+                    msg.len = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
+                    if (SendFrameData(epoll_events_[i].data.fd, msg)) {
+                      EpollUnregister(epoll_fd_, epoll_events_[i].data.fd);
+                      close(epoll_events_[i].data.fd);
+                      device_it->socket_fd = -1;
+                    }
+                    break;
+                  default:
+                    break;
+                }
               } else {
                 EpollUnregister(epoll_fd_, epoll_events_[i].data.fd);
                 close(epoll_events_[i].data.fd);
@@ -555,7 +568,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
   memcpy(msghead_ptr->phone, propara.phone_num, 6);
   msghead_ptr->attribute.bit.package = 0;
   msg_body = &msg.buffer[MSGBODY_NOPACKAGE_POS];
-  msg.len = 12;
+  msg.len = 13;
 
   switch (command) {
     case DOWN_UNIRESPONSE:
@@ -699,12 +712,11 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       break;
   }
 
-  *msg_body = BccCheckSum(&msg.buffer[1], msg.len);
+  *msg_body = BccCheckSum(&msg.buffer[1], msg.len - 1);
   msg.len++;
 
   msg.len = Escape(msg.buffer + 1, msg.len);
   msg.buffer[0] = PROTOCOL_SIGN;
-  msg.len++;
   msg.buffer[msg.len++] = PROTOCOL_SIGN;
 
   printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
@@ -738,7 +750,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   // }
   // printf("\r\n");
 
-  msg.len = UnEscape(&msg.buffer[1], msg.len);
+  msg.len = ReverseEscape(&msg.buffer[1], msg.len);
   msghead_ptr = reinterpret_cast<MessageHead *>(&msg.buffer[1]);
   msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
   if (msghead_ptr->attribute.bit.package) {
@@ -777,7 +789,6 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       }
       break;
     case UP_REGISTER:
-      memset(&propara, 0x0, sizeof(propara));
       propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
       memcpy(propara.phone_num, msghead_ptr->phone, 6);
       if (!device_list_.empty()) {
@@ -807,7 +818,6 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       }
       break;
     case UP_AUTHENTICATION:
-      memset(&propara, 0x0, sizeof(propara));
       propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
       propara.respond_id = EndianSwap16(msghead_ptr->id);
       memcpy(propara.phone_num, msghead_ptr->phone, 6);
@@ -836,14 +846,14 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
     case UP_GETPARASPONSE:
       printf("%s[%d]: received get terminal parameter respond\n",
              __FILE__, __LINE__);
+      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
+      propara.respond_id = EndianSwap16(msghead_ptr->id);
       if (msghead_ptr->attribute.bit.package) {
         memcpy(&u16val, &msg.buffer[13], 2);
         propara.packet_total_num = EndianSwap16(u16val);
         memcpy(&u16val, &msg.buffer[15], 2);
         propara.packet_sequence_num = EndianSwap16(u16val);
       }
-      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
-      propara.respond_id = EndianSwap16(msghead_ptr->id);
       msg_body += 3;
       if (propara.terminal_parameter_list != nullptr) {
         int len = msghead_ptr->attribute.bit.msglen - 3;
@@ -884,6 +894,8 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       break;
     case UP_UPDATERESULT:
       printf("%s[%d]: received updateresult respond: ", __FILE__, __LINE__);
+      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
+      propara.respond_id = EndianSwap16(msghead_ptr->id);
       if (msg_body[4] == 0x00) {
         printf("normal\r\n");
       } else if(msg_body[4] == 0x01) {
@@ -893,9 +905,12 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       } else if(msg_body[4] == 0x03) {
         printf("message not support\r\n");
       }
+      propara.respond_result = kSuccess;
       break;
     case UP_POSITIONREPORT:
       printf("%s[%d]: received position report respond:\n", __FILE__, __LINE__);
+      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
+      propara.respond_id = EndianSwap16(msghead_ptr->id);
       memset(phone_num, 0x0, sizeof(phone_num));
       StringFromBcdCompress(reinterpret_cast<char *>(msghead_ptr->phone),
                             phone_num, 6);
@@ -921,6 +936,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
               phone_num, latitude, longitude, altitude, speed, bearing,
               timestamp[0], timestamp[1], timestamp[2],
               timestamp[3], timestamp[4], timestamp[5]);
+      propara.respond_result = kSuccess;
     default:
       break;
   }
