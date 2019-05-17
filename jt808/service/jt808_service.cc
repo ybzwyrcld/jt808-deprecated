@@ -611,9 +611,9 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
   uint32_t u32val;
   MessageHead *msghead_ptr;
 
-  msghead_ptr = (MessageHead *)&msg.buffer[1];
+  msghead_ptr = reinterpret_cast<MessageHead *>(&msg.buffer[1]);
   msghead_ptr->id = EndianSwap16(command);
-  msghead_ptr->attribute.val = 0x0000;
+  msghead_ptr->attribute.val = 0;
   msghead_ptr->attribute.bit.encrypt = 0;
   message_flow_num_++;
   msghead_ptr->msgflownum = EndianSwap16(message_flow_num_);
@@ -632,9 +632,8 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msg_body += 2;
       *msg_body = propara.respond_result;
       msg_body++;
-      msghead_ptr->attribute.bit.msglen = 5;
-      msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
       msg.len += 5;
+      msghead_ptr->attribute.bit.msglen = 5;
       break;
     case DOWN_REGISTERRESPONSE:
       u16val = EndianSwap16(propara.respond_flow_num);
@@ -652,7 +651,6 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         msghead_ptr->attribute.bit.msglen = 3;
         msg.len += 3;
       }
-      msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
       break;
     case DOWN_SETTERMPARA:
       if (propara.packet_total_num > 1) {
@@ -707,7 +705,6 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         msg.len++;
         msghead_ptr->attribute.bit.msglen = 1;
       }
-      msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
       break;
     case DOWN_GETTERMPARA:
       break;
@@ -723,16 +720,13 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
           msg.len += 4;
           msghead_ptr->attribute.bit.msglen += 4;
       }
-      msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
       break;
     case DOWN_UPDATEPACKAGE:
       if (propara.packet_total_num > 1) {
         msghead_ptr->attribute.bit.package = 1;
-        u16val = propara.packet_total_num;
-        u16val = EndianSwap16(u16val);
+        u16val = EndianSwap16(propara.packet_total_num);
         memcpy(&msg.buffer[13], &u16val, 2);
-        u16val = propara.packet_sequence_num;
-        u16val = EndianSwap16(u16val);
+        u16val = EndianSwap16(propara.packet_sequence_num);
         memcpy(&msg.buffer[15], &u16val, 2);
         msg_body += 4;
         msg.len += 4;
@@ -758,7 +752,6 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msg.len += propara.packet_data_len;
       msghead_ptr->attribute.bit.msglen = 11 + propara.version_num_len +
                                           propara.packet_data_len;
-      msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
       break;
     case DOWN_PASSTHROUGH:
       *msg_body = propara.pass_through->type;
@@ -768,11 +761,12 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
              propara.pass_through->size);
       msg.len += propara.pass_through->size;
       msghead_ptr->attribute.bit.msglen = propara.pass_through->size;
-      msghead_ptr->attribute.val = EndianSwap16(msghead_ptr->attribute.val);
       break;
     default:
       break;
   }
+  u16val = msghead_ptr->attribute.val;
+  msghead_ptr->attribute.val = EndianSwap16(u16val);
 
   *msg_body = BccCheckSum(&msg.buffer[1], msg.len - 1);
   msg.len++;
@@ -781,11 +775,11 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
   msg.buffer[0] = PROTOCOL_SIGN;
   msg.buffer[msg.len++] = PROTOCOL_SIGN;
 
-  printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
-  for (uint16_t i = 0; i < msg.len; ++i) {
-    printf("%02X ", msg.buffer[i]);
-  }
-  printf("\r\n");
+  // printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
+  // for (uint16_t i = 0; i < msg.len; ++i) {
+  //   printf("%02X ", msg.buffer[i]);
+  // }
+  // printf("\r\n");
 
   return msg.len;
 }
@@ -795,8 +789,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   uint8_t *msg_body;
   char phone_num[12] = {0};
   uint8_t u8val;
-  uint16_t retval;
-  uint16_t u16val = 0;
+  uint16_t u16val;
   uint32_t u32val;
   MessageHead *msghead_ptr;
   MessageBodyAttr msgbody_attribute;
@@ -809,16 +802,20 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
 
   msg.len = ReverseEscape(&msg.buffer[1], msg.len);
   msghead_ptr = reinterpret_cast<MessageHead *>(&msg.buffer[1]);
-  msgbody_attribute.val = EndianSwap16(msghead_ptr->attribute.val);
+  msgbody_attribute.val = msghead_ptr->attribute.val;
+  msgbody_attribute.val = EndianSwap16(msgbody_attribute.val);
   if (msgbody_attribute.bit.package) {
     msg_body = &msg.buffer[MSGBODY_PACKAGE_POS];
   } else {
     msg_body = &msg.buffer[MSGBODY_NOPACKAGE_POS];
   }
 
-  u16val = EndianSwap16(msghead_ptr->id);
-  retval = u16val;
-  switch (u16val) {
+  u16val = msghead_ptr->msgflownum;
+  propara.respond_flow_num = EndianSwap16(u16val);
+  u16val = msghead_ptr->id;
+  uint16_t message_id = EndianSwap16(u16val);
+  propara.respond_id = message_id;
+  switch (message_id) {
     case UP_UNIRESPONSE:
       memcpy(&u16val, &msg_body[2], 2);
       propara.respond_id = EndianSwap16(u16val);
@@ -850,7 +847,6 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       }
       break;
     case UP_REGISTER:
-      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
       memcpy(propara.phone_num, msghead_ptr->phone, 6);
       if (!device_list_.empty()) {
         auto device_it = device_list_.begin();
@@ -879,8 +875,6 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       }
       break;
     case UP_AUTHENTICATION:
-      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
-      propara.respond_id = EndianSwap16(msghead_ptr->id);
       memcpy(propara.phone_num, msghead_ptr->phone, 6);
       if (!device_list_.empty()) {
         auto device_it = device_list_.begin();
@@ -907,8 +901,6 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
     case UP_GETPARARESPONSE:
       printf("%s[%d]: received get terminal parameter respond\n",
              __FILE__, __LINE__);
-      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
-      propara.respond_id = EndianSwap16(msghead_ptr->id);
       if (msgbody_attribute.bit.package) {
         memcpy(&u16val, &msg.buffer[13], 2);
         propara.packet_total_num = EndianSwap16(u16val);
@@ -955,8 +947,6 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       break;
     case UP_UPDATERESULT:
       printf("%s[%d]: received updateresult: ", __FILE__, __LINE__);
-      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
-      propara.respond_id = EndianSwap16(msghead_ptr->id);
       if (msg_body[4] == 0x00) {
         printf("normal\r\n");
       } else if(msg_body[4] == 0x01) {
@@ -970,15 +960,12 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       break;
     case UP_POSITIONREPORT:
       printf("%s[%d]: received position report:\n", __FILE__, __LINE__);
-      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
-      propara.respond_id = EndianSwap16(msghead_ptr->id);
       ParsePositionReport(msg);
       propara.respond_result = kSuccess;
+      break;
     case UP_PASSTHROUGH:
       printf("%s[%d]: received up passthrough\n",
              __FILE__, __LINE__);
-      propara.respond_flow_num = EndianSwap16(msghead_ptr->msgflownum);
-      propara.respond_id = EndianSwap16(msghead_ptr->id);
       if (propara.pass_through == nullptr) {
         propara.pass_through = new PassThrough;
         memset(propara.pass_through, 0x0, sizeof(PassThrough));
@@ -994,7 +981,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       break;
   }
 
-  return retval;
+  return message_id;
 }
 
 static void PrepareParemeterIdList(std::vector<std::string> &va_vec,
