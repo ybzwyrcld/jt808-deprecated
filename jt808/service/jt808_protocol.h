@@ -6,6 +6,7 @@
 
 #include <list>
 
+#include "service/jt808_can.h"
 #include "service/jt808_passthrough.h"
 #include "service/jt808_position_report.h"
 #include "service/jt808_terminal_parameters.h"
@@ -19,6 +20,7 @@
 #define UP_GETPARARESPONSE   0x0104  // 查询终端参数应答
 #define UP_UPDATERESULT      0x0108  // 终端升级结果
 #define UP_POSITIONREPORT    0x0200  // 位置信息上报
+#define UP_CANBUSDATAUPLOAD  0x0705  // CAN 总线数据上传
 #define UP_PASSTHROUGH       0x0900  // 数据上行透传
 
 #define DOWN_UNIRESPONSE        0x8001  // 平台通用应答
@@ -85,9 +87,11 @@ struct ProtocolParameters {
   uint8_t authen_code[4];
   uint8_t version_num[32];
   uint8_t packet_data[1024];
+  CanBusDataTimestamp can_bus_data_timestamp;
+  PassThrough *pass_through;
+  std::vector<CanBusDataItem *> *can_bus_data_item_list;
   std::list<TerminalParameter *> *terminal_parameter_list;
   uint8_t *terminal_parameter_id_buffer;
-  PassThrough *pass_through;
 };
 
 // 消息体属性

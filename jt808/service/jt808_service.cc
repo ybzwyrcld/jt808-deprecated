@@ -87,7 +87,7 @@ static uint16_t Escape(uint8_t *src, const int &len) {
     if (src[i] == PROTOCOL_SIGN) {
       buffer[j++] = PROTOCOL_ESCAPE;
       buffer[j++] = PROTOCOL_ESCAPE_SIGN;
-    } else if(src[i] == PROTOCOL_ESCAPE) {
+    } else if (src[i] == PROTOCOL_ESCAPE) {
       buffer[j++] = PROTOCOL_ESCAPE;
       buffer[j++] = PROTOCOL_ESCAPE_ESCAPE;
     } else {
@@ -180,6 +180,12 @@ static void ParsePositionReport(const MessageData &msg) {
           speed, bearing,
           timestamp[0], timestamp[1], timestamp[2],
           timestamp[3], timestamp[4], timestamp[5]);
+  if (msg.len >= 46) {
+    fprintf(stdout, "\tgnss satellite count: %d\n", msg.buffer[43]);
+  }
+  if (msg.len >= 51) {
+    fprintf(stdout, "\tgnss position status: %d\n", msg.buffer[48]);
+  }
 }
 
 static uint8_t GetParameterTypeByParameterId(const uint32_t &para_id) {
@@ -282,6 +288,22 @@ static void ClearListElement(std::list<T *> *list) {
   list = nullptr;
 }
 
+template <class T>
+static void ClearListElement(std::vector<T *> *list) {
+  if (list == nullptr || list->empty()) {
+    return ;
+  }
+
+  auto element_it = list->begin();
+  while (element_it != list->end()) {
+    delete (*element_it);
+    element_it = list->erase(element_it);
+  }
+
+  delete list;
+  list = nullptr;
+}
+
 static void ReadDevicesList(const char *path, std::list<DeviceNode> &list) {
   char *result;
   char line[128] = {0};
@@ -312,10 +334,10 @@ static void ReadDevicesList(const char *path, std::list<DeviceNode> &list) {
 }
 
 Jt808Service::~Jt808Service() {
-  if(listen_sock_ > 0){
+  if (listen_sock_ > 0) {
     close(listen_sock_);
   }
-  if(epoll_fd_ > 0){
+  if (epoll_fd_ > 0) {
     close(epoll_fd_);
   }
   device_list_.clear();
@@ -584,7 +606,7 @@ int Jt808Service::RecvFrameData(const int &fd, MessageData &msg) {
       printf("%s[%d]: recv data failed!!!\n", __FILE__, __LINE__);
     }
     msg.len = 0;
-  } else if(ret == 0) {
+  } else if (ret == 0) {
     ret = -1;
     msg.len = 0;
     printf("%s[%d]: connection disconect!!!\n", __FILE__, __LINE__);
@@ -830,11 +852,11 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       // respond result.
       if (msg_body[4] == kSuccess) {
         printf("normal\r\n");
-      } else if(msg_body[4] == kFailure) {
+      } else if (msg_body[4] == kFailure) {
         printf("failed\r\n");
-      } else if(msg_body[4] == kMessageHasWrong) {
+      } else if (msg_body[4] == kMessageHasWrong) {
         printf("message has something wrong\r\n");
-      } else if(msg_body[4] == kNotSupport) {
+      } else if (msg_body[4] == kNotSupport) {
         printf("message not support\r\n");
       }
       break;
@@ -843,8 +865,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       if (!device_list_.empty()) {
         auto device_it = device_list_.begin();
         while (device_it != device_list_.end()) {
-          BcdFromStringCompress(device_it->phone_num,
-                                phone_num,
+          BcdFromStringCompress(device_it->phone_num, phone_num,
                                 strlen(device_it->phone_num));
           if (memcmp(phone_num, msghead_ptr->phone, 6) == 0) {
             break;
@@ -871,8 +892,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       if (!device_list_.empty()) {
         auto device_it = device_list_.begin();
         while (device_it != device_list_.end()) {
-          BcdFromStringCompress(device_it->phone_num,
-                                phone_num,
+          BcdFromStringCompress(device_it->phone_num, phone_num,
                                 strlen(device_it->phone_num));
           if (memcmp(phone_num, msghead_ptr->phone, 6) == 0) {
             break;
@@ -941,11 +961,11 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       printf("%s[%d]: received updateresult: ", __FILE__, __LINE__);
       if (msg_body[4] == 0x00) {
         printf("normal\r\n");
-      } else if(msg_body[4] == 0x01) {
+      } else if (msg_body[4] == 0x01) {
         printf("failed\r\n");
-      } else if(msg_body[4] == 0x02) {
+      } else if (msg_body[4] == 0x02) {
         printf("message has something wrong\r\n");
-      } else if(msg_body[4] == 0x03) {
+      } else if (msg_body[4] == 0x03) {
         printf("message not support\r\n");
       }
       propara.respond_result = kSuccess;
@@ -956,8 +976,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       propara.respond_result = kSuccess;
       break;
     case UP_PASSTHROUGH:
-      printf("%s[%d]: received up passthrough\n",
-             __FILE__, __LINE__);
+      printf("%s[%d]: received up passthrough\n", __FILE__, __LINE__);
       if (propara.pass_through == nullptr) {
         propara.pass_through = new PassThrough;
         memset(propara.pass_through, 0x0, sizeof(PassThrough));
@@ -968,6 +987,47 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       memcpy(propara.pass_through->buffer,
              msg_body, propara.pass_through->size);
       propara.respond_result = kSuccess;
+      break;
+    case UP_CANBUSDATAUPLOAD:
+      printf("%s[%d]: received up can bus data:\n", __FILE__, __LINE__);
+      if (propara.can_bus_data_item_list == nullptr) {
+        propara.can_bus_data_item_list = new std::vector<CanBusDataItem *>;
+      }
+      memcpy(&u16val, &msg_body[0], 2);
+      msg_body += 2;
+      u16val = EndianSwap16(u16val);
+      if (u16val > 0) {
+        uint16_t max_item_count = u16val;
+        u8val = HexFromBcd(msg_body[0]);
+        propara.can_bus_data_timestamp.hour = u8val;
+        u8val = HexFromBcd(msg_body[1]);
+        propara.can_bus_data_timestamp.minute = u8val;
+        u8val = HexFromBcd(msg_body[2]);
+        propara.can_bus_data_timestamp.second = u8val;
+        u8val = HexFromBcd(msg_body[3]);
+        u16val = u8val * 10;
+        u8val = HexFromBcd(msg_body[4]);
+        u16val += u8val;
+        propara.can_bus_data_timestamp.millisecond = u16val;
+        msg_body += 5;
+        CanBusDataItem *item;
+        while (max_item_count--) {
+          item = new CanBusDataItem;
+          memcpy(&(item->can_id), &msg_body[0], 4);
+          msg_body += 4;
+          memcpy(item->buffer, &msg_body[0], 8);
+          msg_body += 8;
+          propara.can_bus_data_item_list->push_back(item);
+        }
+        fprintf(stdout, "\tcount: %lu\n"
+                        "\ttimestamp: %02d:%02d:%02d%04d\n",
+                propara.can_bus_data_item_list->size(),
+                propara.can_bus_data_timestamp.hour,
+                propara.can_bus_data_timestamp.minute,
+                propara.can_bus_data_timestamp.second,
+                propara.can_bus_data_timestamp.millisecond);
+        ClearListElement(propara.can_bus_data_item_list);
+      }
       break;
     default:
       break;
