@@ -151,9 +151,9 @@ static void ParsePositionReport(const MessageData &msg) {
   memcpy(&u32val, &msg.buffer[17], 4);
   status_bit.value = EndianSwap32(u32val);
   memcpy(&u32val, &msg.buffer[21], 4);
-  longitude = EndianSwap32(u32val) / 1000000.0;
-  memcpy(&u32val, &msg.buffer[25], 4);
   latitude = EndianSwap32(u32val) / 1000000.0;
+  memcpy(&u32val, &msg.buffer[25], 4);
+  longitude = EndianSwap32(u32val) / 1000000.0;
   memcpy(&u16val, &msg.buffer[29], 2);
   altitude = EndianSwap16(u16val);
   memcpy(&u16val, &msg.buffer[31], 2);
@@ -311,14 +311,6 @@ static void ReadDevicesList(const char *path, std::list<DeviceNode> &list) {
   }
 }
 
-Jt808Service::Jt808Service() {
-  listen_sock_ = 0;
-  epoll_fd_ = 0;
-  max_count_ = 0;
-  message_flow_num_ = 0;
-  epoll_events_ = nullptr;
-}
-
 Jt808Service::~Jt808Service() {
   if(listen_sock_ > 0){
     close(listen_sock_);
@@ -430,9 +422,9 @@ int Jt808Service::AcceptNewClient(void) {
              &keepinterval, sizeof(keepinterval));
   setsockopt(new_sock, SOL_TCP, TCP_KEEPCNT, &keepcount, sizeof(keepcount));
 
-  if (!RecvFrameData(new_sock, message_)) {
+  if (!RecvFrameData(new_sock, msg)) {
     memset(&propara, 0x0, sizeof(propara));
-    command = Jt808FrameParse(message_, propara);
+    command = Jt808FrameParse(msg, propara);
     switch (command) {
       case UP_REGISTER:
         memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);

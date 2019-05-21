@@ -27,10 +27,12 @@ struct DeviceNode {
 
 class Jt808Service {
  public:
-  Jt808Service();
+  Jt808Service() = default;
+  Jt808Service(const Jt808Service&) = delete;
+  Jt808Service& operator=(const Jt808Service&) = delete;
   virtual ~Jt808Service();
 
-  // init service.
+  // Init service.
   bool Init(const int &port, const int &max_count);
   bool Init(const char *ip, const int &port, const int &max_count);
   int AcceptNewClient(void);
@@ -81,7 +83,7 @@ class Jt808Service {
 
   int ParseCommand(char *command);
 
-  // upgrade thread.
+  // Deal upgrade request thread.
   void UpgradeHandler(void);
   static void *StartUpgradeThread(void *arg) {
     Jt808Service *_this = reinterpret_cast<Jt808Service *>(arg);
@@ -93,17 +95,16 @@ class Jt808Service {
   const char *kDevicesFilePath = "./devices/devices.list";
   const char *kCommandInterfacePath = "/tmp/jt808cmd.sock";
 
-  int listen_sock_;
-  int epoll_fd_;
-  int max_count_;
-  int message_flow_num_;
-  int socket_fd_;
-  int client_fd_;
+  int listen_sock_ = -1;
+  int epoll_fd_ = -1;
+  int max_count_ = 0;
+  int message_flow_num_ = 0;
+  int socket_fd_ = -1;
+  int client_fd_ = -1;
   uid_t uid_;
-  MessageData message_;
+  char file_path[256] = {0};
   std::list<DeviceNode> device_list_;
-  char file_path[256];
-  struct epoll_event *epoll_events_;
+  struct epoll_event *epoll_events_ = nullptr;
 };
 
 #endif // JT808_SERVICE_JT808_SERVICE_H_
