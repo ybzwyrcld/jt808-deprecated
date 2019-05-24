@@ -767,6 +767,183 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msghead_ptr->attribute.bit.msglen = 11 + propara.version_num_len +
                                           propara.packet_data_len;
       break;
+    case DOWN_SETCIRCULARAREA:
+      *msg_body = propara.set_area_type;
+      msg_body++;
+      *msg_body = propara.circular_area_list->size();
+      msg_body++;
+      msg.len += 2;
+      msghead_ptr->attribute.bit.msglen = 2;
+      CircularArea *circ_area;
+      while (!propara.circular_area_list->empty()) {
+        circ_area = propara.circular_area_list->back();
+        u32val = EndianSwap32(circ_area->area_id);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        u16val = EndianSwap16(circ_area->area_attribute.value);
+        memcpy(msg_body, &u16val, 2);
+        msg_body += 2;
+        u32val = circ_area->center_point.latitude;
+        u32val = EndianSwap32(u32val);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        u32val = circ_area->center_point.longitude;
+        u32val = EndianSwap32(u32val);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        u32val = EndianSwap32(circ_area->radius);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        msg.len += 18;
+        msghead_ptr->attribute.bit.msglen += 18;
+        if (circ_area->area_attribute.bit.bytime) {
+          memcpy(msg_body, circ_area->start_time, 6);
+          msg_body += 6;
+          memcpy(msg_body, circ_area->end_time, 6);
+          msg_body += 6;
+          msg.len += 12;
+          msghead_ptr->attribute.bit.msglen += 12;
+        }
+        if (circ_area->area_attribute.bit.speedlimit) {
+          u16val = EndianSwap16(circ_area->max_speed);
+          memcpy(msg_body, &u16val, 2);
+          msg_body += 2;
+          *msg_body++ = circ_area->overspeed_duration;
+          msg.len += 3;
+          msghead_ptr->attribute.bit.msglen += 3;
+        }
+        delete [] circ_area;
+        propara.circular_area_list->pop_back();
+      }
+      delete propara.circular_area_list;
+      //propara.circular_area_list = nullptr;
+      break;
+    case DOWN_SETRECTANGLEAREA:
+      *msg_body = propara.set_area_type;
+      msg_body++;
+      *msg_body = propara.rectangle_area_list->size();
+      msg_body++;
+      msg.len += 2;
+      msghead_ptr->attribute.bit.msglen = 2;
+      RectangleArea *rect_area;
+      while (!propara.rectangle_area_list->empty()) {
+        rect_area = propara.rectangle_area_list->back();
+        u32val = EndianSwap32(rect_area->area_id);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        u16val = EndianSwap16(rect_area->area_attribute.value);
+        memcpy(msg_body, &u16val, 2);
+        msg_body += 2;
+        u32val = rect_area->upper_left_corner.latitude;
+        u32val = EndianSwap32(u32val);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        u32val = rect_area->upper_left_corner.longitude;
+        u32val = EndianSwap32(u32val);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        u32val = rect_area->bottom_right_corner.latitude;
+        u32val = EndianSwap32(u32val);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        u32val = rect_area->bottom_right_corner.longitude;
+        u32val = EndianSwap32(u32val);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        msg.len += 22;
+        msghead_ptr->attribute.bit.msglen += 12;
+        if (rect_area->area_attribute.bit.bytime) {
+          memcpy(msg_body, rect_area->start_time, 6);
+          msg_body += 6;
+          memcpy(msg_body, rect_area->end_time, 6);
+          msg_body += 6;
+          msg.len += 12;
+          msghead_ptr->attribute.bit.msglen += 12;
+        }
+        if (rect_area->area_attribute.bit.speedlimit) {
+          u16val = EndianSwap16(rect_area->max_speed);
+          memcpy(msg_body, &u16val, 2);
+          msg_body += 2;
+          *msg_body++ = rect_area->overspeed_duration;
+          msg.len += 3;
+          msghead_ptr->attribute.bit.msglen += 3;
+        }
+        delete [] rect_area;
+        propara.rectangle_area_list->pop_back();
+      }
+      delete propara.rectangle_area_list;
+      //propara.rectangle_area_list = nullptr;
+      break;
+    case DOWN_SETPOLYGONALAREA:
+      *msg_body = propara.set_area_type;
+      msg_body++;
+      *msg_body = propara.polygonal_area_list->size();
+      msg_body++;
+      msg.len += 2;
+      msghead_ptr->attribute.bit.msglen = 2;
+      PolygonalArea *poly_area;
+      while (!propara.polygonal_area_list->empty()) {
+        poly_area = propara.polygonal_area_list->back();
+        u32val = EndianSwap32(poly_area->area_id);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        u16val = EndianSwap16(poly_area->area_attribute.value);
+        memcpy(msg_body, &u16val, 2);
+        msg_body += 2;
+        msg.len += 6;
+        msghead_ptr->attribute.bit.msglen += 6;
+        if (poly_area->area_attribute.bit.bytime) {
+          memcpy(msg_body, poly_area->start_time, 6);
+          msg_body += 6;
+          memcpy(msg_body, poly_area->end_time, 6);
+          msg_body += 6;
+          msg.len += 12;
+          msghead_ptr->attribute.bit.msglen += 12;
+        }
+        if (poly_area->area_attribute.bit.speedlimit) {
+          u16val = EndianSwap16(poly_area->max_speed);
+          memcpy(msg_body, &u16val, 2);
+          msg_body += 2;
+          *msg_body++ = poly_area->overspeed_duration;
+          msg.len += 3;
+          msghead_ptr->attribute.bit.msglen += 3;
+        }
+        u16val = EndianSwap16(poly_area->coordinate_count);
+        memcpy(msg_body, &u16val, 2);
+        msg_body += 2;
+        msg.len += 2;
+        msghead_ptr->attribute.bit.msglen += 2;
+        while (!poly_area->coordinate_list->empty()) {
+          u32val = EndianSwap32(poly_area->coordinate_list->back()->latitude);
+          memcpy(msg_body, &u32val, 4);
+          msg_body += 4;
+          u32val = EndianSwap32(poly_area->coordinate_list->back()->longitude);
+          memcpy(msg_body, &u32val, 4);
+          msg_body += 4;
+          msg.len += 8;
+          msghead_ptr->attribute.bit.msglen += 8;
+          delete poly_area->coordinate_list->back();
+          poly_area->coordinate_list->pop_back();
+        }
+        delete [] poly_area;
+        propara.polygonal_area_list->pop_back();
+      }
+      delete propara.polygonal_area_list;
+      //propara.polygonal_area_list = nullptr;
+      break;
+    case DOWN_DELCIRCULARAREA:
+    case DOWN_DELRECTANGLEAREA:
+    case DOWN_DELPOLYGONALAREA:
+      *msg_body++ = propara.area_route_id_count;
+      msg.len += 1;
+      msghead_ptr->attribute.bit.msglen = 1;
+      for (int i = 0; i < propara.area_route_id_count; ++i) {
+        memcpy(msg_body, propara.area_route_id_buffer + i*4, 4);
+        msg_body += 4;
+        msg.len += 4;
+        msghead_ptr->attribute.bit.msglen += 4;
+      }
+      break;
     case DOWN_PASSTHROUGH:
       *msg_body = propara.pass_through->type;
       msg_body++;
@@ -840,6 +1017,30 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
           break;
         case DOWN_SETTERMPARA:
           printf("%s[%d]: received set terminal parameter respond: ",
+                 __FILE__, __LINE__);
+          break;
+        case DOWN_SETCIRCULARAREA:
+          printf("%s[%d]: received set circular area respond: ",
+                 __FILE__, __LINE__);
+          break;
+        case DOWN_DELCIRCULARAREA:
+          printf("%s[%d]: received delete circular area respond: ",
+                 __FILE__, __LINE__);
+          break;
+        case DOWN_SETRECTANGLEAREA:
+          printf("%s[%d]: received set rectangle area respond: ",
+                 __FILE__, __LINE__);
+          break;
+        case DOWN_DELRECTANGLEAREA:
+          printf("%s[%d]: received delete rectangle area respond: ",
+                 __FILE__, __LINE__);
+          break;
+        case DOWN_SETPOLYGONALAREA:
+          printf("%s[%d]: received set polygonal area respond: ",
+                 __FILE__, __LINE__);
+          break;
+        case DOWN_DELPOLYGONALAREA:
+          printf("%s[%d]: received delete polygonal area respond: ",
                  __FILE__, __LINE__);
           break;
         case DOWN_PASSTHROUGH:
@@ -1692,6 +1893,338 @@ int Jt808Service::DealSetTerminalParameterRequest(
   return retval;
 }
 
+int Jt808Service::DealSetCircularAreaRequest(
+                      DeviceNode &device, std::vector<std::string> &va_vec) {
+  int retval = 0;
+  uint32_t u32val;
+  double doubleval;
+  char time[6] = {0};
+
+  std::string arg;
+  ProtocolParameters propara = {0};
+  MessageData msg = {0};
+
+  propara.circular_area_list = new std::vector<CircularArea*>;
+  arg = va_vec.back();
+  if (arg == "update") {
+    propara.set_area_type = 0;
+  } else if (arg == "append") {
+    propara.set_area_type = 1;
+  } else if (arg == "modify") {
+    propara.set_area_type = 2;
+  }
+  va_vec.pop_back();
+  CircularArea *area;
+  while (!va_vec.empty()) {
+    area = new CircularArea;
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%x", &u32val);
+    area->area_id = u32val;
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%x", &u32val);
+    area->area_attribute.value = static_cast<uint16_t>(u32val);
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%lf", &doubleval);
+    area->center_point.latitude = static_cast<uint32_t>(doubleval * 1000000UL);
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%lf", &doubleval);
+    area->center_point.longitude = static_cast<uint32_t>(doubleval * 1000000UL);
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%u", &area->radius);
+    va_vec.pop_back();
+    if (area->area_attribute.bit.bytime) {
+      arg = va_vec.back();
+      BcdFromStringCompress(arg.c_str(), time, arg.length());
+      memcpy(area->start_time, time, 6);
+      va_vec.pop_back();
+      arg = va_vec.back();
+      BcdFromStringCompress(arg.c_str(), time, arg.length());
+      memcpy(area->end_time, time, 6);
+      va_vec.pop_back();
+    }
+    if (area->area_attribute.bit.speedlimit) {
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%u", &u32val);
+      area->max_speed = u32val;
+      va_vec.pop_back();
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%u", &u32val);
+      area->overspeed_duration = static_cast<uint8_t>(u32val);
+      va_vec.pop_back();
+    }
+    propara.circular_area_list->push_back(area);
+  }
+
+  if (propara.circular_area_list->empty()) {
+    return retval;
+  }
+
+  PreparePhoneNum(device.phone_num, propara.phone_num);
+  Jt808FramePack(msg, DOWN_SETCIRCULARAREA, propara);
+  SendFrameData(device.socket_fd, msg);
+  while (1) {
+    memset(&msg, 0x0, sizeof(msg));
+    if (RecvFrameData(device.socket_fd, msg)) {
+      close(device.socket_fd);
+      device.socket_fd = -1;
+      break;
+    } else if (msg.len > 0) {
+      if (Jt808FrameParse(msg, propara) &&
+          (propara.respond_id == DOWN_SETCIRCULARAREA)) {
+        break;
+      }
+    }
+  }
+  return retval;
+}
+
+int Jt808Service::DealSetRectangleAreaRequest(
+                      DeviceNode &device, std::vector<std::string> &va_vec) {
+  int retval = 0;
+  uint32_t u32val;
+  double doubleval;
+  char time[6] = {0};
+
+  std::string arg;
+  ProtocolParameters propara = {0};
+  MessageData msg = {0};
+
+  propara.rectangle_area_list = new std::vector<RectangleArea*>;
+  arg = va_vec.back();
+  if (arg == "update") {
+    propara.set_area_type = 0;
+  } else if (arg == "append") {
+    propara.set_area_type = 1;
+  } else if (arg == "modify") {
+    propara.set_area_type = 2;
+  }
+  va_vec.pop_back();
+  RectangleArea *area;
+  while (!va_vec.empty()) {
+    area = new RectangleArea;
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%x", &u32val);
+    area->area_id = u32val;
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%x", &u32val);
+    area->area_attribute.value = static_cast<uint16_t>(u32val);
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%lf", &doubleval);
+    area->upper_left_corner.latitude =
+        static_cast<uint32_t>(doubleval * 1000000UL);
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%lf", &doubleval);
+    area->upper_left_corner.longitude =
+        static_cast<uint32_t>(doubleval * 1000000UL);
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%lf", &doubleval);
+    area->bottom_right_corner.latitude =
+        static_cast<uint32_t>(doubleval * 1000000UL);
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%lf", &doubleval);
+    area->bottom_right_corner.longitude =
+        static_cast<uint32_t>(doubleval * 1000000UL);
+    va_vec.pop_back();
+    if (area->area_attribute.bit.bytime) {
+      arg = va_vec.back();
+      BcdFromStringCompress(arg.c_str(), time, arg.length());
+      memcpy(area->start_time, time, 6);
+      va_vec.pop_back();
+      arg = va_vec.back();
+      BcdFromStringCompress(arg.c_str(), time, arg.length());
+      memcpy(area->end_time, time, 6);
+      va_vec.pop_back();
+    }
+    if (area->area_attribute.bit.speedlimit) {
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%u", &u32val);
+      area->max_speed = u32val;
+      va_vec.pop_back();
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%u", &u32val);
+      area->overspeed_duration = static_cast<uint8_t>(u32val);
+      va_vec.pop_back();
+    }
+    propara.rectangle_area_list->push_back(area);
+  }
+
+  if (propara.rectangle_area_list->empty()) {
+    return retval;
+  }
+
+  PreparePhoneNum(device.phone_num, propara.phone_num);
+  Jt808FramePack(msg, DOWN_SETRECTANGLEAREA, propara);
+  SendFrameData(device.socket_fd, msg);
+  while (1) {
+    memset(&msg, 0x0, sizeof(msg));
+    if (RecvFrameData(device.socket_fd, msg)) {
+      close(device.socket_fd);
+      device.socket_fd = -1;
+      break;
+    } else if (msg.len > 0) {
+      if (Jt808FrameParse(msg, propara) &&
+          (propara.respond_id == DOWN_SETRECTANGLEAREA)) {
+        break;
+      }
+    }
+  }
+  return retval;
+}
+
+int Jt808Service::DealSetPolygonalAreaRequest(
+                      DeviceNode &device, std::vector<std::string> &va_vec) {
+  int retval = 0;
+  uint32_t u32val;
+  double doubleval;
+  char time[6] = {0};
+
+  std::string arg;
+  ProtocolParameters propara = {0};
+  MessageData msg = {0};
+
+  propara.polygonal_area_list = new std::vector<PolygonalArea*>;
+  arg = va_vec.back();
+  if (arg == "update") {
+    propara.set_area_type = 0;
+  } else if (arg == "append") {
+    propara.set_area_type = 1;
+  } else if (arg == "modify") {
+    propara.set_area_type = 2;
+  }
+  va_vec.pop_back();
+  PolygonalArea *area;
+  while (!va_vec.empty()) {
+    area = new PolygonalArea;
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%x", &u32val);
+    area->area_id = u32val;
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%x", &u32val);
+    area->area_attribute.value = static_cast<uint16_t>(u32val);
+    va_vec.pop_back();
+    if (area->area_attribute.bit.bytime) {
+      arg = va_vec.back();
+      BcdFromStringCompress(arg.c_str(), time, arg.length());
+      memcpy(area->start_time, time, 6);
+      va_vec.pop_back();
+      arg = va_vec.back();
+      BcdFromStringCompress(arg.c_str(), time, arg.length());
+      memcpy(area->end_time, time, 6);
+      va_vec.pop_back();
+    }
+    if (area->area_attribute.bit.speedlimit) {
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%u", &u32val);
+      area->max_speed = u32val;
+      va_vec.pop_back();
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%u", &u32val);
+      area->overspeed_duration = static_cast<uint8_t>(u32val);
+      va_vec.pop_back();
+    }
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%u", &u32val);
+    area->coordinate_count = static_cast<uint8_t>(u32val);
+    va_vec.pop_back();
+    area->coordinate_list = new std::vector<Coordinate*>;
+    Coordinate *coordinate;
+    for (int i = 0; i < area->coordinate_count; ++i) {
+      coordinate = new Coordinate;
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%lf", &doubleval);
+      coordinate->latitude = static_cast<uint32_t>(doubleval * 1000000UL);
+      va_vec.pop_back();
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%lf", &doubleval);
+      coordinate->longitude = static_cast<uint32_t>(doubleval * 1000000UL);
+      va_vec.pop_back();
+      area->coordinate_list->push_back(coordinate);
+    }
+    reverse(area->coordinate_list->begin(), area->coordinate_list->end());
+    propara.polygonal_area_list->push_back(area);
+  }
+
+  if (propara.polygonal_area_list->empty()) {
+    return retval;
+  }
+
+  PreparePhoneNum(device.phone_num, propara.phone_num);
+  Jt808FramePack(msg, DOWN_SETPOLYGONALAREA, propara);
+  SendFrameData(device.socket_fd, msg);
+  while (1) {
+    memset(&msg, 0x0, sizeof(msg));
+    if (RecvFrameData(device.socket_fd, msg)) {
+      close(device.socket_fd);
+      device.socket_fd = -1;
+      break;
+    } else if (msg.len > 0) {
+      if (Jt808FrameParse(msg, propara) &&
+          (propara.respond_id == DOWN_SETPOLYGONALAREA)) {
+        break;
+      }
+    }
+  }
+  return retval;
+}
+
+int Jt808Service::DealAreaRouteDelateRequest(DeviceNode &device,
+                                             std::vector<std::string> &va_vec,
+                                             const uint16_t &command) {
+  int retval = -1;
+  uint32_t u32val;
+  uint32_t area_route_id;
+  std::string arg;
+  ProtocolParameters propara = {0};
+  MessageData msg = {0};
+
+  PreparePhoneNum(device.phone_num, propara.phone_num);
+  propara.area_route_id_count = 0;
+  if (!va_vec.empty()) {
+    propara.area_route_id_buffer = new uint8_t [va_vec.size() * 4];
+    uint8_t *ptr = propara.area_route_id_buffer;
+    while (!va_vec.empty()) {
+      arg = va_vec.back();
+      va_vec.pop_back();
+      sscanf(arg.c_str(), "%x", &u32val);
+      area_route_id = EndianSwap32(u32val);
+      memcpy(ptr, &area_route_id, 4);
+      ptr += 4;
+      propara.area_route_id_count++;
+    }
+  }
+  Jt808FramePack(msg, command, propara);
+  delete [] propara.area_route_id_buffer;
+
+  if (SendFrameData(device.socket_fd, msg)) {
+    close(device.socket_fd);
+    device.socket_fd = -1;
+  } else {
+    while (1) {
+      memset(&msg, 0x0, sizeof(msg));
+      if (RecvFrameData(device.socket_fd, msg)) {
+        close(device.socket_fd);
+        device.socket_fd = -1;
+        break;
+      } else if (msg.len > 0) {
+        if (Jt808FrameParse(msg, propara) && (propara.respond_id == command)) {
+            retval = 0;
+            break;
+        }
+      }
+    }
+  }
+  return retval;
+}
 int Jt808Service::ParseCommand(char *buffer) {
   int retval = 0;
   std::string arg;
@@ -1782,44 +2315,65 @@ int Jt808Service::ParseCommand(char *buffer) {
           retval = DealGetNtripServiceRequest(*device_it, buffer);
         } else if (arg == "jt808service") {
           retval = DealGetJt808ServiceRequest(*device_it, buffer);
-        } else if (arg == "terminalparameter") {
-          retval = DealGetTerminalParameterRequest(*device_it, va_vec);
-          if (retval == 0) {
-            std::string result = "terminal parameter(id:value): ";
-            while (!va_vec.empty()) {
-              result += va_vec.back();
-              va_vec.pop_back();
-              if (va_vec.empty()) {
-                break;
-              }
-              result += ",";
-            }
-            result.copy(buffer, result.size(), 0);
-          }
         }
         EpollRegister(epoll_fd_, device_it->socket_fd);
-      } else if (arg == "set") {
+      } else if (arg == "getterminalparameter") {
         EpollUnregister(epoll_fd_, device_it->socket_fd);
-        arg = va_vec.back();
-        va_vec.pop_back();
-        if (arg == "startup") {
-          retval = DealSetStartupRequest(*device_it, va_vec);
-        } else if (arg == "gps") {
-          retval = DealSetGpsRequest(*device_it, va_vec);
-        } else if (arg == "cdradio") {
-          retval = DealSetCdradioRequest(*device_it, va_vec);
-        } else if (arg == "ntripcors") {
-          retval = DealSetNtripCorsRequest(*device_it, va_vec);
-        } else if (arg == "ntripservice") {
-          retval = DealSetNtripServiceRequest(*device_it, va_vec);
-        } else if (arg == "jt808service") {
-          retval = DealSetJt808ServiceRequest(*device_it, va_vec);
-        } else if (arg == "terminalparameter") {
+        retval = DealGetTerminalParameterRequest(*device_it, va_vec);
+        if (retval == 0) {
+          std::string result = "terminal parameter(id:value): ";
+          while (!va_vec.empty()) {
+            result += va_vec.back();
+            va_vec.pop_back();
+            if (va_vec.empty()) {
+              break;
+            }
+            result += ",";
+          }
+          result.copy(buffer, result.size(), 0);
+        }
+        EpollRegister(epoll_fd_, device_it->socket_fd);
+      } else {
+        retval = -1;
+        EpollUnregister(epoll_fd_, device_it->socket_fd);
+        if (arg == "set") {
+          arg = va_vec.back();
+          va_vec.pop_back();
+          if (arg == "startup") {
+            retval = DealSetStartupRequest(*device_it, va_vec);
+          } else if (arg == "gps") {
+            retval = DealSetGpsRequest(*device_it, va_vec);
+          } else if (arg == "cdradio") {
+            retval = DealSetCdradioRequest(*device_it, va_vec);
+          } else if (arg == "ntripcors") {
+            retval = DealSetNtripCorsRequest(*device_it, va_vec);
+          } else if (arg == "ntripservice") {
+            retval = DealSetNtripServiceRequest(*device_it, va_vec);
+          } else if (arg == "jt808service") {
+            retval = DealSetJt808ServiceRequest(*device_it, va_vec);
+          }
+        } else if (arg == "setterminalparameter") {
           retval = DealSetTerminalParameterRequest(*device_it, va_vec);
+        } else if (arg == "setcirculararea") {
+          retval = DealSetCircularAreaRequest(*device_it, va_vec);
+        } else if (arg == "delcirculararea") {
+          retval = DealAreaRouteDelateRequest(*device_it, va_vec,
+                                              DOWN_DELCIRCULARAREA);
+        } else if (arg == "setrectanglearea") {
+          retval = DealSetRectangleAreaRequest(*device_it, va_vec);
+        } else if (arg == "delrectanglearea") {
+          retval = DealAreaRouteDelateRequest(*device_it, va_vec,
+                                              DOWN_DELRECTANGLEAREA);
+        } else if (arg == "setpolygonalarea") {
+          retval = DealSetPolygonalAreaRequest(*device_it, va_vec);
+        } else if (arg == "delpolygonalarea") {
+          retval = DealAreaRouteDelateRequest(*device_it, va_vec,
+                                              DOWN_DELPOLYGONALAREA);
         }
         if (retval == 0) {
           memcpy(buffer, "operation completed.", 20);
         } else {
+          retval = 0;
           memcpy(buffer, "operation failed!!!", 19);
         }
         EpollRegister(epoll_fd_, device_it->socket_fd);

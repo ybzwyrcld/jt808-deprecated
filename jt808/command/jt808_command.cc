@@ -16,15 +16,30 @@ static inline void PrintUsage(void) {
   printf("Usage: jt808-command phonenum [options ...]\n"
          "Options:\n"
          "get startup/gps/cdradio/ntripcors/ntripservice/jt808service\n"
-         "    terminalparameter [parameterid ...]\n"
          "set startup [gps] [cdradio] [ntripcors] [ntripservice] "
-                      "[jt808service]\n"
+                     "[jt808service]\n"
          "    gps [LOGGGA] [LOGRMC] [LOGATT]\n"
          "    cdradio bauderate workfreqpoint recvmode formcode\n"
          "    ntripcors ip port user passwd mntpoint reportinterval\n"
          "    ntripservice ip port user passwd mntpont reportinterval\n"
          "    jt808service ip port phonenum reportinterval\n"
-         "    terminalparameter [parameterid(HEX):parametervalue ...]\n"
+         "getterminalparameter [parameterid ...]\n"
+         "setterminalparameter [parameterid(HEX):parametervalue ...]\n"
+         "setcirculararea update/append/modify [areaid(hex) areaattr(hex) "
+                         "latitude longitude radius "
+                         "[starttime(yy-mm-dd-hh-mm-ss)] [endtime] "
+                         "[maxspeed] [overspeedtime] ...]\n"
+         "setrectanglearea update/append/modify [areaid(hex) areaattr(hex) "
+                          "coordinate1(latitude longitude) coordinate2 "
+                          "[starttime(yy-mm-dd-hh-mm-ss)] [endtime] "
+                          "[maxspeed] [overspeedtime] ...]\n"
+         "setpolygonalarea update/append/modify [areaid(hex) areaattr(hex) "
+                          "[starttime(yy-mm-dd-hh-mm-ss)] [endtime] "
+                          "[maxspeed] [overspeedtime] coordinatecount "
+                          "[[latitude longitude] ...] ...]\n"
+         "delcirculararea [areaid ...]\n"
+         "delrectanglearea [areaid ...]\n"
+         "delpolygonalarea [areaid ...]\n"
          "upgrade system/device/gps/cdradio versionid filepath\n");
 
   exit(0);
@@ -34,7 +49,7 @@ int main(int argc, char **argv) {
   std::string command;
   char recv_buf[65536] = {0};
 
-  if (argc < 4) {
+  if (argc < 3) {
     PrintUsage();
   }
 

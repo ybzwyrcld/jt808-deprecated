@@ -6,6 +6,7 @@
 
 #include <list>
 
+#include "service/jt808_area_route.h"
 #include "service/jt808_can.h"
 #include "service/jt808_passthrough.h"
 #include "service/jt808_position_report.h"
@@ -29,6 +30,12 @@
 #define DOWN_GETTERMPARA        0x8104  // 查询终端参数
 #define DOWN_GETSPECTERMPARA    0x8106  // 查询指定终端参数
 #define DOWN_UPDATEPACKAGE      0x8108  // 下发终端升级包
+#define DOWN_SETCIRCULARAREA    0x8600  // 设置圆形区域
+#define DOWN_DELCIRCULARAREA    0x8601  // 删除圆形区域
+#define DOWN_SETRECTANGLEAREA   0x8602  // 设置矩形区域
+#define DOWN_DELRECTANGLEAREA   0x8603  // 删除矩形区域
+#define DOWN_SETPOLYGONALAREA   0x8604  // 设置多边形区域
+#define DOWN_DELPOLYGONALAREA   0x8605  // 删除多边形区域
 #define DOWN_PASSTHROUGH        0x8900  // 数据下行透传
 
 #define MSGBODY_NOPACKAGE_POS     13
@@ -76,7 +83,9 @@ struct ProtocolParameters {
   uint8_t respond_para_num;
   uint8_t version_num_len;
   uint8_t upgrade_type;
+  uint8_t set_area_type;
   uint8_t terminal_parameter_id_count;
+  uint8_t area_route_id_count;
   uint16_t respond_flow_num;
   uint16_t respond_id;
   uint16_t packet_total_num;
@@ -89,9 +98,13 @@ struct ProtocolParameters {
   uint8_t packet_data[1024];
   CanBusDataTimestamp can_bus_data_timestamp;
   PassThrough *pass_through;
+  std::vector<CircularArea *> *circular_area_list;
+  std::vector<RectangleArea *> *rectangle_area_list;
+  std::vector<PolygonalArea *> *polygonal_area_list;
   std::vector<CanBusDataItem *> *can_bus_data_item_list;
   std::list<TerminalParameter *> *terminal_parameter_list;
   uint8_t *terminal_parameter_id_buffer;
+  uint8_t *area_route_id_buffer;
 };
 
 // 消息体属性

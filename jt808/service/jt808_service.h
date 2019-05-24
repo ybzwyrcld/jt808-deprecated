@@ -78,8 +78,18 @@ class Jt808Service {
                                  std::vector<std::string> &va_vec);
   int DealGetTerminalParameterRequest(DeviceNode &device,
                                       std::vector<std::string> &va_vec);
+
   int DealSetTerminalParameterRequest(DeviceNode &device,
                                       std::vector<std::string> &va_vec);
+  int DealSetCircularAreaRequest(DeviceNode &device,
+                                 std::vector<std::string> &va_vec);
+  int DealSetRectangleAreaRequest(DeviceNode &device,
+                                  std::vector<std::string> &va_vec);
+  int DealSetPolygonalAreaRequest(DeviceNode &device,
+                                  std::vector<std::string> &va_vec);
+  int DealAreaRouteDelateRequest(DeviceNode &device,
+                                 std::vector<std::string> &va_vec,
+                                 const uint16_t &command);
 
   int ParseCommand(char *command);
 
