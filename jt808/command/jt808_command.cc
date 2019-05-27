@@ -13,7 +13,7 @@
 
 
 static inline void PrintUsage(void) {
-  printf("Usage: jt808-command phonenum [options ...]\n"
+  printf("Usage: jt808command phonenum [options ...]\n"
          "Options:\n"
          "get startup/gps/cdradio/ntripcors/ntripservice/jt808service\n"
          "set startup [gps] [cdradio] [ntripcors] [ntripservice] "

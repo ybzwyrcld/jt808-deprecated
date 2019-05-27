@@ -6,16 +6,16 @@ INC=-I.
 LDFLAGS=
 
 
-all: jt808-service jt808-command
+all: jt808service jt808command
 
 
-jt808-service: main.o \
+jt808service: main.o \
 	bcd/bcd.o \
 	service/jt808_service.o \
 	unix_socket/unix_socket.o
 	$(CC)g++ $^ -pthread -o $@
 
-jt808-command: command/jt808_command.o \
+jt808command: command/jt808_command.o \
 	unix_socket/unix_socket.o
 	$(CC)g++ $^ -o $@
 
@@ -24,8 +24,10 @@ jt808-command: command/jt808_command.o \
 
 
 install:
-	mv jt808-service jt808-command run/
+	$(CC)strip jt808service jt808command
+
 
 clean:
-	rm -rf run/* jt808-* *.o service/*.o command/*.o bcd/*.o unix_socket/*.o
+	rm -rf jt808service jt808command
+	rm -rf *.o service/*.o command/*.o bcd/*.o unix_socket/*.o
 
