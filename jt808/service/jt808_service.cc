@@ -25,6 +25,7 @@
 
 #include "bcd/bcd.h"
 #include "unix_socket/unix_socket.h"
+#include "util/container_clear.h"
 
 
 static int EpollRegister(const int &epoll_fd, const int &fd) {
@@ -186,122 +187,6 @@ static void ParsePositionReport(const MessageData &msg) {
   if (msg.len >= 51) {
     fprintf(stdout, "\tgnss position status: %d\n", msg.buffer[48]);
   }
-}
-
-static uint8_t GetParameterTypeByParameterId(const uint32_t &para_id) {
-  switch (para_id) {
-    case GNSSPOSITIONMODE: case GNSSBAUDERATE: case GNSSOUTPUTFREQ:
-    case GNSSUPLOADWAY: case STARTUPGPS: case STARTUPCDRADIO:
-    case STARTUPNTRIPCORS: case STARTUPNTRIPSERV: case STARTUPJT808SERV:
-    case GPSLOGGGA: case GPSLOGRMC: case GPSLOGATT:
-    case CDRADIORECEIVEMODE: case CDRADIOFORMCODE: case NTRIPCORSREPORTINTERVAL:
-    case NTRIPSERVICEREPORTINTERVAL: case JT808SERVICEREPORTINTERVAL:
-      return kByteType;
-    case CAN1UPLOADINTERVAL: case CAN2UPLOADINTERVAL: case CDRADIOWORKINGFREQ:
-    case NTRIPCORSPORT: case NTRIPSERVICEPORT: case JT808SERVICEPORT:
-      return kWordType;
-    case HEARTBEATINTERVAL: case TCPRESPONDTIMEOUT: case TCPMSGRETRANSTIMES:
-    case UDPRESPONDTIMEOUT: case UDPMSGRETRANSTIMES: case SMSRESPONDTIMEOUT:
-    case SMSMSGRETRANSTIMES: case POSITIONREPORTWAY: case POSITIONREPORTPLAN:
-    case NOTLOGINREPORTTIMEINTERVAL: case SLEEPREPORTTIMEINTERVAL:
-    case ALARMREPORTTIMEINTERVAL: case DEFTIMEREPORTTIMEINTERVAL:
-    case NOTLOGINREPORTDISTANCEINTERVAL: case SLEEPREPORTDISTANCEINTERVAL:
-    case ALARMREPORTDISTANCEINTERVAL: case DEFTIMEREPORTDISTANCEINTERVAL:
-    case INFLECTIONPOINTRETRANSANGLE: case ALARMSHIELDWORD: case ALARMSENDTXT:
-    case ALARMSHOOTSWITCH: case ALARMSHOOTSAVEFLAGS: case ALARMKEYFLAGS:
-    case MAXSPEED: case GNSSOUTPUTCOLLECTFREQ: case GNSSUPLOADSET:
-    case CAN1COLLECTINTERVAL: case CAN2COLLECTINTERVAL: case CDRADIOBAUDERATE:
-      return kDwordType;
-    case CANSPECIALSET: case NTRIPCORSIP: case NTRIPCORSUSERNAME:
-    case NTRIPCORSPASSWD: case NTRIPCORSMOUNTPOINT: case NTRIPSERVICEIP:
-    case NTRIPSERVICEUSERNAME: case NTRIPSERVICEPASSWD:
-    case NTRIPSERVICEMOUNTPOINT: case JT808SERVICEIP: case JT808SERVICEPHONENUM:
-      return kStringType;
-    default:
-      return kUnknowType;
-  }
-}
-
-static uint8_t GetParameterLengthByParameterType(const uint8_t &para_type) {
-  switch (para_type) {
-    case kByteType:
-      return 1;
-    case kWordType:
-      return 2;
-    case kDwordType:
-      return 4;
-    case kStringType:
-    case kUnknowType:
-    default:
-      return 0;
-   }
-}
-
-static void AddParameterNodeIntoList(std::list<TerminalParameter *> *para_list,
-                                     const uint32_t &para_id,
-                                     const char *para_value) {
-  if (para_list == nullptr) {
-    return ;
-  }
-
-  TerminalParameter *node = new TerminalParameter;
-  memset(node, 0x0, sizeof(*node));
-  node->parameter_id = para_id;
-  node->parameter_type = GetParameterTypeByParameterId(para_id);
-  node->parameter_len = GetParameterLengthByParameterType(
-                             node->parameter_type);
-  if (para_value != nullptr) {
-    if (node->parameter_type == kStringType) {
-      node->parameter_len = strlen(para_value);
-    }
-    memcpy(node->parameter_value, para_value, node->parameter_len);
-  }
-  para_list->push_back(node);
-}
-
-template <class T>
-static void ClearListElement(std::list<T *> &list) {
-  if (list.empty()) {
-    return ;
-  }
-
-  auto element_it = list.begin();
-  while (element_it != list.end()) {
-    delete (*element_it);
-    element_it = list.erase(element_it);
-  }
-}
-
-template <class T>
-static void ClearListElement(std::list<T *> *list) {
-  if (list == nullptr || list->empty()) {
-    return ;
-  }
-
-  auto element_it = list->begin();
-  while (element_it != list->end()) {
-    delete (*element_it);
-    element_it = list->erase(element_it);
-  }
-
-  delete list;
-  list = nullptr;
-}
-
-template <class T>
-static void ClearListElement(std::vector<T *> *list) {
-  if (list == nullptr || list->empty()) {
-    return ;
-  }
-
-  auto element_it = list->begin();
-  while (element_it != list->end()) {
-    delete (*element_it);
-    element_it = list->erase(element_it);
-  }
-
-  delete list;
-  list = nullptr;
 }
 
 static void ReadDevicesList(const char *path, std::list<DeviceNode> &list) {
@@ -768,172 +653,226 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
                                           propara.packet_data_len;
       break;
     case DOWN_SETCIRCULARAREA:
-      *msg_body = propara.set_area_type;
+      *msg_body = propara.set_area_route_type;
       msg_body++;
       *msg_body = propara.circular_area_list->size();
       msg_body++;
       msg.len += 2;
       msghead_ptr->attribute.bit.msglen = 2;
-      CircularArea *circ_area;
-      while (!propara.circular_area_list->empty()) {
-        circ_area = propara.circular_area_list->back();
-        u32val = EndianSwap32(circ_area->area_id);
+      for (auto circular_area : *propara.circular_area_list) {
+        u32val = EndianSwap32(circular_area->area_id);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
-        u16val = EndianSwap16(circ_area->area_attribute.value);
+        u16val = EndianSwap16(circular_area->area_attribute.value);
         memcpy(msg_body, &u16val, 2);
         msg_body += 2;
-        u32val = circ_area->center_point.latitude;
-        u32val = EndianSwap32(u32val);
+        u32val = EndianSwap32(circular_area->center_point.latitude);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
-        u32val = circ_area->center_point.longitude;
-        u32val = EndianSwap32(u32val);
+        u32val = EndianSwap32(circular_area->center_point.longitude);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
-        u32val = EndianSwap32(circ_area->radius);
+        u32val = EndianSwap32(circular_area->radius);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
         msg.len += 18;
         msghead_ptr->attribute.bit.msglen += 18;
-        if (circ_area->area_attribute.bit.bytime) {
-          memcpy(msg_body, circ_area->start_time, 6);
+        if (circular_area->area_attribute.bit.bytime) {
+          memcpy(msg_body, circular_area->start_time, 6);
           msg_body += 6;
-          memcpy(msg_body, circ_area->end_time, 6);
+          memcpy(msg_body, circular_area->end_time, 6);
           msg_body += 6;
           msg.len += 12;
           msghead_ptr->attribute.bit.msglen += 12;
         }
-        if (circ_area->area_attribute.bit.speedlimit) {
-          u16val = EndianSwap16(circ_area->max_speed);
+        if (circular_area->area_attribute.bit.speedlimit) {
+          u16val = EndianSwap16(circular_area->max_speed);
           memcpy(msg_body, &u16val, 2);
           msg_body += 2;
-          *msg_body++ = circ_area->overspeed_duration;
+          *msg_body++ = circular_area->overspeed_duration;
           msg.len += 3;
           msghead_ptr->attribute.bit.msglen += 3;
         }
-        delete [] circ_area;
-        propara.circular_area_list->pop_back();
       }
+      ClearListElement(propara.circular_area_list);
       delete propara.circular_area_list;
-      //propara.circular_area_list = nullptr;
       break;
     case DOWN_SETRECTANGLEAREA:
-      *msg_body = propara.set_area_type;
+      *msg_body = propara.set_area_route_type;
       msg_body++;
       *msg_body = propara.rectangle_area_list->size();
       msg_body++;
       msg.len += 2;
       msghead_ptr->attribute.bit.msglen = 2;
-      RectangleArea *rect_area;
-      while (!propara.rectangle_area_list->empty()) {
-        rect_area = propara.rectangle_area_list->back();
-        u32val = EndianSwap32(rect_area->area_id);
+      for (auto rectangle_area : *propara.rectangle_area_list) {
+        u32val = EndianSwap32(rectangle_area->area_id);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
-        u16val = EndianSwap16(rect_area->area_attribute.value);
+        u16val = EndianSwap16(rectangle_area->area_attribute.value);
         memcpy(msg_body, &u16val, 2);
         msg_body += 2;
-        u32val = rect_area->upper_left_corner.latitude;
-        u32val = EndianSwap32(u32val);
+        u32val = EndianSwap32(rectangle_area->upper_left_corner.latitude);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
-        u32val = rect_area->upper_left_corner.longitude;
-        u32val = EndianSwap32(u32val);
+        u32val = EndianSwap32(rectangle_area->upper_left_corner.longitude);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
-        u32val = rect_area->bottom_right_corner.latitude;
-        u32val = EndianSwap32(u32val);
+        u32val = EndianSwap32(rectangle_area->bottom_right_corner.latitude);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
-        u32val = rect_area->bottom_right_corner.longitude;
-        u32val = EndianSwap32(u32val);
+        u32val = EndianSwap32(rectangle_area->bottom_right_corner.longitude);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
         msg.len += 22;
         msghead_ptr->attribute.bit.msglen += 12;
-        if (rect_area->area_attribute.bit.bytime) {
-          memcpy(msg_body, rect_area->start_time, 6);
+        if (rectangle_area->area_attribute.bit.bytime) {
+          memcpy(msg_body, rectangle_area->start_time, 6);
           msg_body += 6;
-          memcpy(msg_body, rect_area->end_time, 6);
+          memcpy(msg_body, rectangle_area->end_time, 6);
           msg_body += 6;
           msg.len += 12;
           msghead_ptr->attribute.bit.msglen += 12;
         }
-        if (rect_area->area_attribute.bit.speedlimit) {
-          u16val = EndianSwap16(rect_area->max_speed);
+        if (rectangle_area->area_attribute.bit.speedlimit) {
+          u16val = EndianSwap16(rectangle_area->max_speed);
           memcpy(msg_body, &u16val, 2);
           msg_body += 2;
-          *msg_body++ = rect_area->overspeed_duration;
+          *msg_body++ = rectangle_area->overspeed_duration;
           msg.len += 3;
           msghead_ptr->attribute.bit.msglen += 3;
         }
-        delete [] rect_area;
-        propara.rectangle_area_list->pop_back();
       }
+      ClearListElement(propara.rectangle_area_list);
       delete propara.rectangle_area_list;
-      //propara.rectangle_area_list = nullptr;
       break;
     case DOWN_SETPOLYGONALAREA:
-      *msg_body = propara.set_area_type;
+      *msg_body = propara.set_area_route_type;
       msg_body++;
       *msg_body = propara.polygonal_area_list->size();
       msg_body++;
       msg.len += 2;
       msghead_ptr->attribute.bit.msglen = 2;
-      PolygonalArea *poly_area;
-      while (!propara.polygonal_area_list->empty()) {
-        poly_area = propara.polygonal_area_list->back();
-        u32val = EndianSwap32(poly_area->area_id);
+      for (auto polygonal_area : *propara.polygonal_area_list) {
+        u32val = EndianSwap32(polygonal_area->area_id);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
-        u16val = EndianSwap16(poly_area->area_attribute.value);
+        u16val = EndianSwap16(polygonal_area->area_attribute.value);
         memcpy(msg_body, &u16val, 2);
         msg_body += 2;
         msg.len += 6;
         msghead_ptr->attribute.bit.msglen += 6;
-        if (poly_area->area_attribute.bit.bytime) {
-          memcpy(msg_body, poly_area->start_time, 6);
+        if (polygonal_area->area_attribute.bit.bytime) {
+          memcpy(msg_body, polygonal_area->start_time, 6);
           msg_body += 6;
-          memcpy(msg_body, poly_area->end_time, 6);
+          memcpy(msg_body, polygonal_area->end_time, 6);
           msg_body += 6;
           msg.len += 12;
           msghead_ptr->attribute.bit.msglen += 12;
         }
-        if (poly_area->area_attribute.bit.speedlimit) {
-          u16val = EndianSwap16(poly_area->max_speed);
+        if (polygonal_area->area_attribute.bit.speedlimit) {
+          u16val = EndianSwap16(polygonal_area->max_speed);
           memcpy(msg_body, &u16val, 2);
           msg_body += 2;
-          *msg_body++ = poly_area->overspeed_duration;
+          *msg_body++ = polygonal_area->overspeed_duration;
           msg.len += 3;
           msghead_ptr->attribute.bit.msglen += 3;
         }
-        u16val = EndianSwap16(poly_area->coordinate_count);
+        u16val = EndianSwap16(polygonal_area->coordinate_count);
         memcpy(msg_body, &u16val, 2);
         msg_body += 2;
         msg.len += 2;
         msghead_ptr->attribute.bit.msglen += 2;
-        while (!poly_area->coordinate_list->empty()) {
-          u32val = EndianSwap32(poly_area->coordinate_list->back()->latitude);
+        for (auto coordinate : *polygonal_area->coordinate_list) {
+          u32val = EndianSwap32(coordinate->latitude);
           memcpy(msg_body, &u32val, 4);
           msg_body += 4;
-          u32val = EndianSwap32(poly_area->coordinate_list->back()->longitude);
+          u32val = EndianSwap32(coordinate->longitude);
           memcpy(msg_body, &u32val, 4);
           msg_body += 4;
           msg.len += 8;
           msghead_ptr->attribute.bit.msglen += 8;
-          delete poly_area->coordinate_list->back();
-          poly_area->coordinate_list->pop_back();
         }
-        delete [] poly_area;
-        propara.polygonal_area_list->pop_back();
+        ClearListElement(polygonal_area->coordinate_list);
+        delete polygonal_area->coordinate_list;
       }
+      ClearListElement(propara.polygonal_area_list);
       delete propara.polygonal_area_list;
-      //propara.polygonal_area_list = nullptr;
+      break;
+    case DOWN_SETROUTE:
+      *msg_body = propara.set_area_route_type;
+      msg_body++;
+      *msg_body = propara.route_list->size();
+      msg_body++;
+      msg.len += 2;
+      msghead_ptr->attribute.bit.msglen = 2;
+      for (auto route : *propara.route_list) {
+        u32val = EndianSwap32(route->route_id);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        u16val = EndianSwap16(route->route_attribute.value);
+        memcpy(msg_body, &u16val, 2);
+        msg_body += 2;
+        msg.len += 6;
+        msghead_ptr->attribute.bit.msglen += 6;
+        if (route->route_attribute.bit.bytime) {
+          memcpy(msg_body, route->start_time, 6);
+          msg_body += 6;
+          memcpy(msg_body, route->end_time, 6);
+          msg_body += 6;
+          msg.len += 12;
+          msghead_ptr->attribute.bit.msglen += 12;
+        }
+        u16val = EndianSwap16(route->inflection_point_count);
+        memcpy(msg_body, &u16val, 2);
+        msg_body += 2;
+        msg.len += 2;
+        msghead_ptr->attribute.bit.msglen += 2;
+        for (auto inflection_point : *route->inflection_point_list) {
+          u32val = EndianSwap32(inflection_point->inflection_point_id);
+          memcpy(msg_body, &u32val, 4);
+          msg_body += 4;
+          u32val = EndianSwap32(inflection_point->road_section_id);
+          memcpy(msg_body, &u32val, 4);
+          msg_body += 4;
+          u32val = EndianSwap32(inflection_point->coordinate.latitude);
+          memcpy(msg_body, &u32val, 4);
+          msg_body += 4;
+          u32val = EndianSwap32(inflection_point->coordinate.longitude);
+          memcpy(msg_body, &u32val, 4);
+          msg_body += 4;
+          *msg_body++ = inflection_point->road_section_wide;
+          *msg_body++ = inflection_point->road_section_attribute.value;
+          msg.len += 18;
+          msghead_ptr->attribute.bit.msglen += 18;
+          if (inflection_point->road_section_attribute.bit.traveltime) {
+            u16val = EndianSwap16(inflection_point->max_driving_time);
+            memcpy(msg_body, &u16val, 2);
+            msg_body += 2;
+            u16val = EndianSwap16(inflection_point->min_driving_time);
+            memcpy(msg_body, &u16val, 2);
+            msg_body += 2;
+            msg.len += 4;
+            msghead_ptr->attribute.bit.msglen += 4;
+          }
+          if (inflection_point->road_section_attribute.bit.speedlimit) {
+            u16val = EndianSwap16(inflection_point->max_speed);
+            memcpy(msg_body, &u16val, 2);
+            msg_body += 2;
+            *msg_body++ = inflection_point->overspeed_duration;
+            msg.len += 3;
+            msghead_ptr->attribute.bit.msglen += 3;
+          }
+        }
+        ClearListElement(route->inflection_point_list);
+        delete route->inflection_point_list;
+      }
+      ClearListElement(propara.route_list);
+      delete propara.route_list;
       break;
     case DOWN_DELCIRCULARAREA:
     case DOWN_DELRECTANGLEAREA:
     case DOWN_DELPOLYGONALAREA:
+    case DOWN_DELROUTE:
       *msg_body++ = propara.area_route_id_count;
       msg.len += 1;
       msghead_ptr->attribute.bit.msglen = 1;
@@ -966,11 +905,11 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
   msg.buffer[0] = PROTOCOL_SIGN;
   msg.buffer[msg.len++] = PROTOCOL_SIGN;
 
-  // printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
-  // for (uint16_t i = 0; i < msg.len; ++i) {
-  //   printf("%02X ", msg.buffer[i]);
-  // }
-  // printf("\r\n");
+  printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
+  for (uint16_t i = 0; i < msg.len; ++i) {
+    printf("%02X ", msg.buffer[i]);
+  }
+  printf("\r\n");
 
   return msg.len;
 }
@@ -1041,6 +980,14 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
           break;
         case DOWN_DELPOLYGONALAREA:
           printf("%s[%d]: received delete polygonal area respond: ",
+                 __FILE__, __LINE__);
+          break;
+        case DOWN_SETROUTE:
+          printf("%s[%d]: received set route respond: ",
+                 __FILE__, __LINE__);
+          break;
+        case DOWN_DELROUTE:
+          printf("%s[%d]: received delete route respond: ",
                  __FILE__, __LINE__);
           break;
         case DOWN_PASSTHROUGH:
@@ -1228,6 +1175,7 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
                 propara.can_bus_data_timestamp.second,
                 propara.can_bus_data_timestamp.millisecond);
         ClearListElement(propara.can_bus_data_item_list);
+        delete propara.can_bus_data_item_list;
       }
       break;
     default:
@@ -1797,6 +1745,7 @@ int Jt808Service::DealGetTerminalParameterRequest(
     }
   }
   ClearListElement(propara.terminal_parameter_list);
+  delete propara.terminal_parameter_list;
   return retval;
 }
 
@@ -1883,6 +1832,7 @@ int Jt808Service::DealSetTerminalParameterRequest(
       }
     }
     ClearListElement(propara.terminal_parameter_list);
+    delete propara.terminal_parameter_list;
     if (va_vec.empty()) {
       break;
     }
@@ -1907,11 +1857,11 @@ int Jt808Service::DealSetCircularAreaRequest(
   propara.circular_area_list = new std::vector<CircularArea*>;
   arg = va_vec.back();
   if (arg == "update") {
-    propara.set_area_type = 0;
+    propara.set_area_route_type = 0;
   } else if (arg == "append") {
-    propara.set_area_type = 1;
+    propara.set_area_route_type = 1;
   } else if (arg == "modify") {
-    propara.set_area_type = 2;
+    propara.set_area_route_type = 2;
   }
   va_vec.pop_back();
   CircularArea *area;
@@ -1996,11 +1946,11 @@ int Jt808Service::DealSetRectangleAreaRequest(
   propara.rectangle_area_list = new std::vector<RectangleArea*>;
   arg = va_vec.back();
   if (arg == "update") {
-    propara.set_area_type = 0;
+    propara.set_area_route_type = 0;
   } else if (arg == "append") {
-    propara.set_area_type = 1;
+    propara.set_area_route_type = 1;
   } else if (arg == "modify") {
-    propara.set_area_type = 2;
+    propara.set_area_route_type = 2;
   }
   va_vec.pop_back();
   RectangleArea *area;
@@ -2094,11 +2044,11 @@ int Jt808Service::DealSetPolygonalAreaRequest(
   propara.polygonal_area_list = new std::vector<PolygonalArea*>;
   arg = va_vec.back();
   if (arg == "update") {
-    propara.set_area_type = 0;
+    propara.set_area_route_type = 0;
   } else if (arg == "append") {
-    propara.set_area_type = 1;
+    propara.set_area_route_type = 1;
   } else if (arg == "modify") {
-    propara.set_area_type = 2;
+    propara.set_area_route_type = 2;
   }
   va_vec.pop_back();
   PolygonalArea *area;
@@ -2150,7 +2100,6 @@ int Jt808Service::DealSetPolygonalAreaRequest(
       va_vec.pop_back();
       area->coordinate_list->push_back(coordinate);
     }
-    reverse(area->coordinate_list->begin(), area->coordinate_list->end());
     propara.polygonal_area_list->push_back(area);
   }
 
@@ -2177,7 +2126,132 @@ int Jt808Service::DealSetPolygonalAreaRequest(
   return retval;
 }
 
-int Jt808Service::DealAreaRouteDelateRequest(DeviceNode &device,
+int Jt808Service::DealSetRouteRequest(DeviceNode &device,
+                                      std::vector<std::string> &va_vec) {
+  int retval = 0;
+  uint32_t u32val;
+  double doubleval;
+  char time[6] = {0};
+
+  std::string arg;
+  ProtocolParameters propara = {0};
+  MessageData msg = {0};
+
+  propara.route_list = new std::vector<Route*>;
+  arg = va_vec.back();
+  if (arg == "update") {
+    propara.set_area_route_type = 0;
+  } else if (arg == "append") {
+    propara.set_area_route_type = 1;
+  } else if (arg == "modify") {
+    propara.set_area_route_type = 2;
+  }
+  va_vec.pop_back();
+  Route *route;
+  while (!va_vec.empty()) {
+    route = new Route;
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%x", &u32val);
+    route->route_id = u32val;
+    va_vec.pop_back();
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%x", &u32val);
+    route->route_attribute.value = static_cast<uint16_t>(u32val);
+    va_vec.pop_back();
+    if (route->route_attribute.bit.bytime) {
+      arg = va_vec.back();
+      BcdFromStringCompress(arg.c_str(), time, arg.length());
+      memcpy(route->start_time, time, 6);
+      va_vec.pop_back();
+      arg = va_vec.back();
+      BcdFromStringCompress(arg.c_str(), time, arg.length());
+      memcpy(route->end_time, time, 6);
+      va_vec.pop_back();
+    }
+    arg = va_vec.back();
+    sscanf(arg.c_str(), "%u", &u32val);
+    route->inflection_point_count = static_cast<uint8_t>(u32val);
+    va_vec.pop_back();
+    route->inflection_point_list = new std::vector<InflectionPoint*>;
+    InflectionPoint *inflection_point;
+    for (int i = 0; i < route->inflection_point_count; ++i) {
+      inflection_point = new InflectionPoint;
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%u", &u32val);
+      inflection_point->inflection_point_id = u32val;
+      va_vec.pop_back();
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%u", &u32val);
+      inflection_point->road_section_id = u32val;
+      va_vec.pop_back();
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%lf", &doubleval);
+      inflection_point->coordinate.latitude =
+          static_cast<uint32_t>(doubleval * 1000000UL);
+      va_vec.pop_back();
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%lf", &doubleval);
+      inflection_point->coordinate.longitude =
+          static_cast<uint32_t>(doubleval * 1000000UL);
+      va_vec.pop_back();
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%u", &u32val);
+      inflection_point->road_section_wide = static_cast<uint8_t>(u32val);
+      va_vec.pop_back();
+      arg = va_vec.back();
+      sscanf(arg.c_str(), "%u", &u32val);
+      inflection_point->road_section_attribute.value =
+          static_cast<uint8_t>(u32val);
+      va_vec.pop_back();
+      if (inflection_point->road_section_attribute.bit.traveltime) {
+        arg = va_vec.back();
+        sscanf(arg.c_str(), "%u", &u32val);
+        inflection_point->max_driving_time = static_cast<uint16_t>(u32val);
+        va_vec.pop_back();
+        arg = va_vec.back();
+        sscanf(arg.c_str(), "%u", &u32val);
+        inflection_point->min_driving_time = static_cast<uint16_t>(u32val);
+        va_vec.pop_back();
+      }
+      if (inflection_point->road_section_attribute.bit.speedlimit) {
+        arg = va_vec.back();
+        sscanf(arg.c_str(), "%u", &u32val);
+        inflection_point->max_speed = u32val;
+        va_vec.pop_back();
+        arg = va_vec.back();
+        sscanf(arg.c_str(), "%u", &u32val);
+        inflection_point->overspeed_duration = static_cast<uint8_t>(u32val);
+        va_vec.pop_back();
+      }
+      route->inflection_point_list->push_back(inflection_point);
+    }
+    propara.route_list->push_back(route);
+  }
+
+  if (propara.route_list->empty()) {
+    return retval;
+  }
+
+  PreparePhoneNum(device.phone_num, propara.phone_num);
+  Jt808FramePack(msg, DOWN_SETROUTE, propara);
+  SendFrameData(device.socket_fd, msg);
+  while (1) {
+    memset(&msg, 0x0, sizeof(msg));
+    if (RecvFrameData(device.socket_fd, msg)) {
+      close(device.socket_fd);
+      device.socket_fd = -1;
+      break;
+    } else if (msg.len > 0) {
+      if (Jt808FrameParse(msg, propara) &&
+          (propara.respond_id == DOWN_SETROUTE)) {
+        break;
+      }
+    }
+  }
+  return retval;
+}
+
+int Jt808Service::DealDeleteAreaRouteRequest(DeviceNode &device,
                                              std::vector<std::string> &va_vec,
                                              const uint16_t &command) {
   int retval = -1;
@@ -2225,6 +2299,7 @@ int Jt808Service::DealAreaRouteDelateRequest(DeviceNode &device,
   }
   return retval;
 }
+
 int Jt808Service::ParseCommand(char *buffer) {
   int retval = 0;
   std::string arg;
@@ -2357,18 +2432,23 @@ int Jt808Service::ParseCommand(char *buffer) {
         } else if (arg == "setcirculararea") {
           retval = DealSetCircularAreaRequest(*device_it, va_vec);
         } else if (arg == "delcirculararea") {
-          retval = DealAreaRouteDelateRequest(*device_it, va_vec,
+          retval = DealDeleteAreaRouteRequest(*device_it, va_vec,
                                               DOWN_DELCIRCULARAREA);
         } else if (arg == "setrectanglearea") {
           retval = DealSetRectangleAreaRequest(*device_it, va_vec);
         } else if (arg == "delrectanglearea") {
-          retval = DealAreaRouteDelateRequest(*device_it, va_vec,
+          retval = DealDeleteAreaRouteRequest(*device_it, va_vec,
                                               DOWN_DELRECTANGLEAREA);
         } else if (arg == "setpolygonalarea") {
           retval = DealSetPolygonalAreaRequest(*device_it, va_vec);
         } else if (arg == "delpolygonalarea") {
-          retval = DealAreaRouteDelateRequest(*device_it, va_vec,
+          retval = DealDeleteAreaRouteRequest(*device_it, va_vec,
                                               DOWN_DELPOLYGONALAREA);
+        } else if (arg == "setroute") {
+          retval = DealSetRouteRequest(*device_it, va_vec);
+        } else if (arg == "delroute") {
+          retval = DealDeleteAreaRouteRequest(*device_it, va_vec,
+                                              DOWN_DELROUTE);
         }
         if (retval == 0) {
           memcpy(buffer, "operation completed.", 20);

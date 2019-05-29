@@ -1,12 +1,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
-#include <iostream>
-#include <fstream>
 #include <string>
 
 #include "unix_socket/unix_socket.h"
@@ -15,34 +12,49 @@
 static inline void PrintUsage(void) {
   printf("Usage: jt808command phonenum [options ...]\n"
          "Options:\n"
-         "get startup/gps/cdradio/ntripcors/ntripservice/jt808service\n"
-         "set startup [gps] [cdradio] [ntripcors] [ntripservice] "
-                     "[jt808service]\n"
-         "    gps [LOGGGA] [LOGRMC] [LOGATT]\n"
-         "    cdradio bauderate workfreqpoint recvmode formcode\n"
-         "    ntripcors ip port user passwd mntpoint reportinterval\n"
-         "    ntripservice ip port user passwd mntpont reportinterval\n"
-         "    jt808service ip port phonenum reportinterval\n"
-         "getterminalparameter [parameterid ...]\n"
-         "setterminalparameter [parameterid(HEX):parametervalue ...]\n"
-         "setcirculararea update/append/modify [areaid(hex) areaattr(hex) "
-                         "latitude longitude radius "
-                         "[starttime(yy-mm-dd-hh-mm-ss)] [endtime] "
-                         "[maxspeed] [overspeedtime] ...]\n"
-         "setrectanglearea update/append/modify [areaid(hex) areaattr(hex) "
-                          "coordinate1(latitude longitude) coordinate2 "
-                          "[starttime(yy-mm-dd-hh-mm-ss)] [endtime] "
-                          "[maxspeed] [overspeedtime] ...]\n"
-         "setpolygonalarea update/append/modify [areaid(hex) areaattr(hex) "
-                          "[starttime(yy-mm-dd-hh-mm-ss)] [endtime] "
-                          "[maxspeed] [overspeedtime] coordinatecount "
-                          "[[latitude longitude] ...] ...]\n"
-         "delcirculararea [areaid ...]\n"
-         "delrectanglearea [areaid ...]\n"
-         "delpolygonalarea [areaid ...]\n"
-         "upgrade system/device/gps/cdradio versionid filepath\n");
-
-  exit(0);
+         "\tgetterminalparameter [parameterid ...]\n"
+         "\tsetterminalparameter [parameterid(HEX):parametervalue ...]\n"
+         "\tsetcirculararea update/append/modify [circularareaitem ...]\n"
+         "\tsetrectanglearea update/append/modify [rectangleareaitem ...]\n"
+         "\tsetpolygonalarea update/append/modify [polygonalareaitem ...]\n"
+         "\tsetroute update/append/modify [routeitem ...] \n"
+         "\tdelcirculararea [areaid ...]\n"
+         "\tdelrectanglearea [areaid ...]\n"
+         "\tdelpolygonalarea [areaid ...]\n"
+         "\tdelroute [routeid ...]\n"
+         "\tupgrade device versionid filepath\n"
+         "\tupgrade gps versionid filepath\n"
+         "Additional instructions:\n"
+         "\tlatitude/longitude -- value in degrees, "
+              "accurate to 6 decimal places.\n"
+         "\troadsection -- the inflection point to the next inflection point.\n"
+         "\thex -- use hexadecimal representation.\n"
+         "\tstarttime/endtime -- yymmddhhmmss\n"
+         "\tcoordinateitem -- latitude longitude\n"
+         "\tcircularareaitem -- id(hex) attribute(hex) coordinateitem radius "
+              "[starttime] [endtime] [maxspeed] [overspeedtime]\n"
+         "\trectangleareaitem -- id(hex) attribute(hex) coordinateitem1 "
+              "coordinateitem2 [starttime] [endtime] "
+              "[maxspeed] [overspeedtime]\n"
+         "\tpolygonalareaitem -- id(hex) attribute(hex) [starttime] [endtime] "
+              "[maxspeed] [overspeedtime] "
+              "coordinatecount [coordinateitem ...]\n"
+         "\trouteitem -- id(hex) attribute(hex) [starttime] [endtime] "
+              "[inflectionpointcount] [inflectionpointitem ...]\n"
+         "\tinflectionpointitem -- id(hex) roadsectionid(hex) coordinateitem "
+              "roadsectionwide roadsectionattribute(hex) "
+              "[maxdrivingtime] [mindrivingtime] [maxspeed] [overspeedtime]\n"
+         "Customization options:\n"
+         "\tget startup/gps/cdradio/ntripcors/ntripservice/jt808service\n"
+         "\tset startup [gps] [cdradio] [ntripcors] [ntripservice] "
+              "[jt808service]\n"
+         "\tset gps [LOGGGA] [LOGRMC] [LOGATT]\n"
+         "\tset cdradio bauderate workfreqpoint recvmode formcode\n"
+         "\tset ntripcors ip port user passwd mntpoint reportinterval\n"
+         "\tset ntripservice ip port user passwd mntpont reportinterval\n"
+         "\tset jt808service ip port phonenum reportinterval\n"
+         "\tupgrade system versionid filepath\n"
+         "\tupgrade cdradio versionid filepath\n");
 }
 
 int main(int argc, char **argv) {
@@ -51,6 +63,7 @@ int main(int argc, char **argv) {
 
   if (argc < 3) {
     PrintUsage();
+    exit(0);
   }
 
   command.clear();

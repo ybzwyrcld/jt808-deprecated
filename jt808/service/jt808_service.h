@@ -87,7 +87,8 @@ class Jt808Service {
                                   std::vector<std::string> &va_vec);
   int DealSetPolygonalAreaRequest(DeviceNode &device,
                                   std::vector<std::string> &va_vec);
-  int DealAreaRouteDelateRequest(DeviceNode &device,
+  int DealSetRouteRequest(DeviceNode &device, std::vector<std::string> &va_vec);
+  int DealDeleteAreaRouteRequest(DeviceNode &device,
                                  std::vector<std::string> &va_vec,
                                  const uint16_t &command);
 

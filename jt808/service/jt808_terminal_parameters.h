@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+#include <list>
+#include <vector>
+
 
 // DWORD 终端心跳发送间隔(s)
 #define HEARTBEATINTERVAL     0x0001
@@ -228,5 +231,15 @@ struct TerminalParameter {
   uint32_t parameter_id;
   uint8_t parameter_value[256];
 };
+
+bool GetNodeFromTerminalParameterListById(
+         const std::list<TerminalParameter> &list,
+         const uint16_t &id,
+         TerminalParameter &node);
+uint8_t GetParameterTypeByParameterId(const uint32_t &para_id);
+uint8_t GetParameterLengthByParameterType(const uint8_t &para_type);
+void AddParameterNodeIntoList(std::list<TerminalParameter *> *para_list,
+                              const uint32_t &para_id, const char *para_value);
+
 
 #endif // JT808_SERVICE_JT808_TERMINAL_PARAMETERS_H_
