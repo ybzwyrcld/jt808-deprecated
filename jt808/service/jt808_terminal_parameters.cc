@@ -1,6 +1,7 @@
 #include "service/jt808_terminal_parameters.h"
 
 #include <string.h>
+#include <algorithm>
 
 
 bool GetNodeFromTerminalParameterListById(
@@ -92,5 +93,20 @@ void AddParameterNodeIntoList(std::list<TerminalParameter *> *para_list,
     memcpy(node->parameter_value, para_value, node->parameter_len);
   }
   para_list->push_back(node);
+}
+
+void PrepareParemeterIdList(std::vector<std::string> &va_vec,
+                            std::vector<uint32_t> &id_vec) {
+  char parameter_id[9] = {0};
+  std::string arg;
+  reverse(id_vec.begin(), id_vec.end());
+  while (!id_vec.empty()) {
+    snprintf(parameter_id, 5, "%04X", id_vec.back());
+    arg = parameter_id;
+    va_vec.push_back(arg);
+    memset(parameter_id, 0x0, sizeof(parameter_id));
+    id_vec.pop_back();
+  }
+  reverse(va_vec.begin(), va_vec.end());
 }
 

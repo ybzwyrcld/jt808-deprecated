@@ -13,6 +13,8 @@ jt808service: main.o \
 	bcd/bcd.o \
 	service/jt808_service.o \
 	service/jt808_terminal_parameters.o \
+	service/jt808_position_report.o \
+	service/jt808_util.o \
 	unix_socket/unix_socket.o
 	$(CC)g++ $^ -pthread -o $@
 

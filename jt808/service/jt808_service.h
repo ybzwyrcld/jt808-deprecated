@@ -1,7 +1,6 @@
 #ifndef JT808_SERVICE_JT808_SERVICE_H_
 #define JT808_SERVICE_JT808_SERVICE_H_
 
-#include <sys/types.h>
 #include <sys/epoll.h>
 #include <string.h>
 
@@ -10,20 +9,9 @@
 #include <vector>
 
 #include "service/jt808_protocol.h"
+#include "service/jt808_util.h"
 #include "unix_socket/unix_socket.h"
 
-
-struct DeviceNode {
-  bool has_upgrade;
-  bool upgrading;
-  char phone_num[12];
-  char authen_code[8];
-  char manufacturer_id[5];
-  char upgrade_version[12];
-  char upgrade_type;
-  char file_path[256];
-  int socket_fd;
-};
 
 class Jt808Service {
  public:

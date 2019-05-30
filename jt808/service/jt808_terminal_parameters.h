@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include <string>
 #include <list>
 #include <vector>
 
@@ -240,6 +241,8 @@ uint8_t GetParameterTypeByParameterId(const uint32_t &para_id);
 uint8_t GetParameterLengthByParameterType(const uint8_t &para_type);
 void AddParameterNodeIntoList(std::list<TerminalParameter *> *para_list,
                               const uint32_t &para_id, const char *para_value);
+void PrepareParemeterIdList(std::vector<std::string> &va_vec,
+                            std::vector<uint32_t> &id_vec);
 
 
 #endif // JT808_SERVICE_JT808_TERMINAL_PARAMETERS_H_
