@@ -8,13 +8,13 @@
 以下操作命令基于 Ubuntu 16.04 系统
 
 
-克隆源码及编译:
+### 下载源码及编译
 ```bash
 $ git clone https://github.com/hanoi404/jt808 && cd jt808/jt808
 $ make all
 ```
 
-运行后台服务:
+### 运行后台服务
 ```bash
 $ ./jt808service
 ```
@@ -30,3 +30,96 @@ $ ./jt808command 13826539850 getterminalparameter 0020
 terminal parameter(id:value): 0020:0
 ```
 
+## CMake
+
+### 编译准备
+```bash
+$ sudo apt install cmake cmake-curses-gui
+```
+
+### 下载源码
+```bash
+$ git clone https://github.com/hanoi404/jt808 && cd jt808/jt808
+$ mkdir build
+```
+
+### 编译后台服务程序
+```bash
+$ mkdir build/service && cd build/service
+$ cmake ../.. && make
+```
+
+### 编译命令行控制程序
+```bash
+$ mkdir build/command && cd build/command
+$ cmake ../../command && make
+```
+
+### 生成 debug 版和 release 版的程序
+
+以后台程序为例:
+```bash
+$ ccmake ../..
+```
+
+第一次可能出现以下界面, 输入`c`继续下一步:
+```bash
+                                                     Page 0 of 1
+                                                      EMPTY CACHE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EMPTY CACHE:
+Press [enter] to edit option                                                                                                 CMake Version 3.5.1]
+Press [c] to configure
+Press [h] for help           Press [q] to quit without generating
+Press [t] to toggle advanced mode (Currently Off)
+```
+
+出现以下界面时，光标移动到`CMAKE_BUILD_TYPE`行上面, 输入`Enter`键进行编辑, 填写`Debug`或`Release`, 完成后再次输入`Enter`键退出编辑, 然后`c`键进行配置, 再输入`g`键生成`Makefile`:
+```bash
+                                                     Page 1 of 1
+CMAKE_BUILD_TYPE                *
+CMAKE_INSTALL_PREFIX            */usr/local
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CMAKE_BUILD_TYPE: Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.)
+Press [enter] to edit option                                                                                                 CMake Version 3.5.1]
+Press [c] to configure
+Press [h] for help           Press [q] to quit without generating
+Press [t] to toggle advanced mode (Currently Off)
+```
+
+编译
+```bash
+$ make
+```
