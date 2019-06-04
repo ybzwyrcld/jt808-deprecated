@@ -2232,84 +2232,76 @@ void Jt808Service::UpgradeHandler(void) {
   char *data = nullptr;
   uint32_t len;
   uint32_t max_data_len;
-  DeviceNode device = {0};
-  bool find_device = false;
 
   if (!device_list_.empty()) {
     for (auto &device : device_list_) {
       if (device.has_upgrade) {
-        find_device = true;
         device.has_upgrade = false;
-        break;
-      }
-    }
+        memset(&propara, 0x0, sizeof(propara));
+        memcpy(propara.version_num, device.upgrade_version,
+               strlen(device.upgrade_version));
+        max_data_len = 1023 - 11 - strlen(device.upgrade_version);
+        EpollUnregister(epoll_fd_, device.socket_fd);
+        ifs.open(device.file_path, std::ios::binary | std::ios::in);
+        if (ifs.is_open()) {
+          ifs.seekg(0, std::ios::end);
+          len = ifs.tellg();
+          ifs.seekg(0, std::ios::beg);
+          data = new char[len];
+          ifs.read(data, len);
+          ifs.close();
 
-    if (!find_device) {
-      return ;
-    }
-
-    memset(&propara, 0x0, sizeof(propara));
-    memcpy(propara.version_num, device.upgrade_version,
-           strlen(device.upgrade_version));
-    max_data_len = 1023 - 11 - strlen(device.upgrade_version);
-    EpollUnregister(epoll_fd_, device.socket_fd);
-    ifs.open(device.file_path, std::ios::binary | std::ios::in);
-    if (ifs.is_open()) {
-      ifs.seekg(0, std::ios::end);
-      len = ifs.tellg();
-      ifs.seekg(0, std::ios::beg);
-      data = new char[len];
-      ifs.read(data, len);
-      ifs.close();
-
-      propara.packet_total_num = len/max_data_len + 1;
-      propara.packet_sequence_num = 1;
-      propara.upgrade_type = device.upgrade_type;
-      propara.version_num_len = strlen(device.upgrade_version);
-      while (len > 0) {
-        memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-        if (len > max_data_len) {
-          propara.packet_data_len = max_data_len;
-        } else {
-          propara.packet_data_len = len;
-        }
-        len -= propara.packet_data_len;
-        // prepare data content of the upgrade file.
-        memset(propara.packet_data, 0x0, sizeof(propara.packet_data));
-        memcpy(propara.packet_data,
-               data + max_data_len * (propara.packet_sequence_num - 1),
-               propara.packet_data_len);
-        msg.len = Jt808FramePack(msg, DOWN_UPDATEPACKAGE, propara);
-        if (SendFrameData(device.socket_fd, msg)) {
-          close(device.socket_fd);
-          device.socket_fd = -1;
-          break;
-        } else {
-          while (1) {
-            if (RecvFrameData(device.socket_fd, msg)) {
+          propara.packet_total_num = len/max_data_len + 1;
+          propara.packet_sequence_num = 1;
+          propara.upgrade_type = device.upgrade_type;
+          propara.version_num_len = strlen(device.upgrade_version);
+          while (len > 0) {
+            memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
+            if (len > max_data_len) {
+              propara.packet_data_len = max_data_len;
+            } else {
+              propara.packet_data_len = len;
+            }
+            len -= propara.packet_data_len;
+            // prepare data content of the upgrade file.
+            memset(propara.packet_data, 0x0, sizeof(propara.packet_data));
+            memcpy(propara.packet_data,
+                   data + max_data_len * (propara.packet_sequence_num - 1),
+                   propara.packet_data_len);
+            msg.len = Jt808FramePack(msg, DOWN_UPDATEPACKAGE, propara);
+            if (SendFrameData(device.socket_fd, msg)) {
               close(device.socket_fd);
               device.socket_fd = -1;
               break;
-            } else if (msg.len > 0) {
-              if ((Jt808FrameParse(msg, propara) == UP_UNIRESPONSE) &&
-                  (propara.respond_id == DOWN_UPDATEPACKAGE)) {
+            } else {
+              while (1) {
+                if (RecvFrameData(device.socket_fd, msg)) {
+                  close(device.socket_fd);
+                  device.socket_fd = -1;
+                  break;
+                } else if (msg.len > 0) {
+                  if ((Jt808FrameParse(msg, propara) == UP_UNIRESPONSE) &&
+                      (propara.respond_id == DOWN_UPDATEPACKAGE)) {
+                    break;
+                  }
+                }
+              }
+              if (device.socket_fd == -1) {
                 break;
               }
+              ++propara.packet_sequence_num;
+              usleep(1000);
             }
           }
-          if (device.socket_fd == -1) {
-            break;
-          }
-          ++propara.packet_sequence_num;
-          usleep(1000);
-        }
-      }
 
-      if (device.socket_fd > 0) {
-        EpollRegister(epoll_fd_, device.socket_fd);
+          if (device.socket_fd > 0) {
+            EpollRegister(epoll_fd_, device.socket_fd);
+          }
+          delete [] data;
+          data = nullptr;
+        }
+        break;
       }
-      delete [] data;
-      data = nullptr;
     }
   }
 }
