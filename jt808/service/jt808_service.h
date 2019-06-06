@@ -82,6 +82,8 @@ class Jt808Service {
   int DealGetPositionInfoRequest(DeviceNode &device);
   int DealPositionTrackRequest(DeviceNode &device,
                                std::vector<std::string> &va_vec);
+  int DealTerminalControlRequest(DeviceNode &device,
+                                 std::vector<std::string> &va_vec);
 
   int ParseCommand(char *command);
 

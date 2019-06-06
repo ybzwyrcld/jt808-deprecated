@@ -29,6 +29,7 @@
 #define DOWN_REGISTERRESPONSE   0x8100  // 终端注册应答
 #define DOWN_SETTERMPARA        0x8103  // 设置终端参数
 #define DOWN_GETTERMPARA        0x8104  // 查询终端参数
+#define DOWN_TERMINALCONTROL    0x8105  // 终端控制
 #define DOWN_GETSPECTERMPARA    0x8106  // 查询指定终端参数
 #define DOWN_UPDATEPACKAGE      0x8108  // 下发终端升级包
 #define DOWN_GETPOSITIONINFO    0x8201  // 查询位置信息
@@ -103,6 +104,7 @@ struct ProtocolParameters {
   uint8_t packet_data[1024];
   uint16_t report_interval;
   uint32_t report_valid_time;
+  uint8_t terminal_control_type;
   CanBusDataTimestamp can_bus_data_timestamp;
   PassThrough *pass_through;
   std::vector<CircularArea *> *circular_area_list;

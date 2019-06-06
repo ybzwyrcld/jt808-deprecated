@@ -421,6 +421,12 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
           msghead_ptr->attribute.bit.msglen += 4;
       }
       break;
+    case DOWN_TERMINALCONTROL:
+      *msg_body = propara.terminal_control_type;
+      msg_body++;
+      msg.len++;
+      msghead_ptr->attribute.bit.msglen += 1;
+      break;
     case DOWN_GETPOSITIONINFO:
       break;
     case DOWN_POSITIONTRACK:
@@ -769,6 +775,10 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
           break;
         case DOWN_SETTERMPARA:
           printf("%s[%d]: received set terminal parameter respond: ",
+                 __FILE__, __LINE__);
+          break;
+        case DOWN_TERMINALCONTROL:
+          printf("%s[%d]: received terminal control respond: ",
                  __FILE__, __LINE__);
           break;
         case DOWN_POSITIONTRACK:
@@ -2150,6 +2160,42 @@ int Jt808Service::DealPositionTrackRequest(DeviceNode &device,
   return retval;
 }
 
+int Jt808Service::DealTerminalControlRequest(DeviceNode &device,
+                                             std::vector<std::string> &va_vec) {
+  int retval = -1;
+  uint32_t u32val;
+  std::string arg;
+  ProtocolParameters propara = {0};
+  MessageData msg = {0};
+
+  arg = va_vec.back();
+  va_vec.pop_back();
+  sscanf(arg.c_str(), "%u", &u32val);
+  propara.terminal_control_type = static_cast<uint8_t>(u32val);
+
+  Jt808FramePack(msg, DOWN_TERMINALCONTROL, propara);
+  if (SendFrameData(device.socket_fd, msg)) {
+    close(device.socket_fd);
+    device.socket_fd = -1;
+  } else {
+    while (1) {
+      memset(&msg, 0x0, sizeof(msg));
+      if (RecvFrameData(device.socket_fd, msg)) {
+        close(device.socket_fd);
+        device.socket_fd = -1;
+        break;
+      } else if (msg.len > 0) {
+        if (Jt808FrameParse(msg, propara) &&
+            (propara.respond_id == DOWN_TERMINALCONTROL)) {
+            retval = 0;
+            break;
+        }
+      }
+    }
+  }
+  return retval;
+}
+
 int Jt808Service::ParseCommand(char *buffer) {
   int retval = 0;
   std::string arg;
@@ -2298,6 +2344,8 @@ int Jt808Service::ParseCommand(char *buffer) {
           retval = DealGetPositionInfoRequest(*device_it);
         } else if (arg == "positiontrack") {
           retval = DealPositionTrackRequest(*device_it, va_vec);
+        } else if (arg == "terminalcontrol") {
+          retval = DealTerminalControlRequest(*device_it, va_vec);
         }
         if (retval == 0) {
           memcpy(buffer, "operation completed.", 20);
