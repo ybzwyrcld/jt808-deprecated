@@ -427,18 +427,6 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msg.len++;
       msghead_ptr->attribute.bit.msglen += 1;
       break;
-    case DOWN_GETPOSITIONINFO:
-      break;
-    case DOWN_POSITIONTRACK:
-      u16val = EndianSwap16(propara.report_interval);
-      memcpy(msg_body, &u16val, 2);
-      msg_body += 2;
-      u32val = EndianSwap32(propara.report_valid_time);
-      memcpy(msg_body, &u32val, 4);
-      msg_body += 4;
-      msg.len += 6;
-      msghead_ptr->attribute.bit.msglen += 6;
-      break;
     case DOWN_UPDATEPACKAGE:
       if (propara.packet_total_num > 1) {
         msghead_ptr->attribute.bit.package = 1;
@@ -470,6 +458,24 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msg.len += propara.packet_data_len;
       msghead_ptr->attribute.bit.msglen += 11 + propara.version_num_len +
                                           propara.packet_data_len;
+      break;
+    case DOWN_GETPOSITIONINFO:
+      break;
+    case DOWN_POSITIONTRACK:
+      u16val = EndianSwap16(propara.report_interval);
+      memcpy(msg_body, &u16val, 2);
+      msg_body += 2;
+      u32val = EndianSwap32(propara.report_valid_time);
+      memcpy(msg_body, &u32val, 4);
+      msg_body += 4;
+      msg.len += 6;
+      msghead_ptr->attribute.bit.msglen += 6;
+      break;
+    case DOWN_VEHICLECONTROL:
+      *msg_body = propara.vehicle_control_flag.value;
+      msg_body++;
+      msg.len++;
+      msghead_ptr->attribute.bit.msglen++;
       break;
     case DOWN_SETCIRCULARAREA:
       *msg_body = propara.set_area_route_type;
@@ -941,6 +947,11 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
     case UP_POSITIONREPORT:
       printf("%s[%d]: received position report:\n", __FILE__, __LINE__);
       ParsePositionReport(msg.buffer, msg.len, 0);
+      propara.respond_result = kSuccess;
+      break;
+    case UP_VEHICLECONTROLRESPONSE:
+      printf("%s[%d]: received vehicle control:\n", __FILE__, __LINE__);
+      ParsePositionReport(msg.buffer, msg.len, 2);
       propara.respond_result = kSuccess;
       break;
     case UP_PASSTHROUGH:
@@ -2196,6 +2207,41 @@ int Jt808Service::DealTerminalControlRequest(DeviceNode &device,
   return retval;
 }
 
+int Jt808Service::DealVehicleControlRequest(DeviceNode &device,
+                                            std::vector<std::string> &va_vec) {
+  int retval = -1;
+  uint32_t u32val;
+  std::string arg;
+  ProtocolParameters propara = {0};
+  MessageData msg = {0};
+
+  arg = va_vec.back();
+  va_vec.pop_back();
+  sscanf(arg.c_str(), "%x", &u32val);
+  propara.vehicle_control_flag.value = static_cast<uint8_t>(u32val);
+
+  Jt808FramePack(msg, DOWN_VEHICLECONTROL, propara);
+  if (SendFrameData(device.socket_fd, msg)) {
+    close(device.socket_fd);
+    device.socket_fd = -1;
+  } else {
+    while (1) {
+      memset(&msg, 0x0, sizeof(msg));
+      if (RecvFrameData(device.socket_fd, msg)) {
+        close(device.socket_fd);
+        device.socket_fd = -1;
+        break;
+      } else if (msg.len > 0) {
+        if (Jt808FrameParse(msg, propara) == UP_VEHICLECONTROLRESPONSE) {
+            retval = 0;
+            break;
+        }
+      }
+    }
+  }
+  return retval;
+}
+
 int Jt808Service::ParseCommand(char *buffer) {
   int retval = 0;
   std::string arg;
@@ -2346,6 +2392,8 @@ int Jt808Service::ParseCommand(char *buffer) {
           retval = DealPositionTrackRequest(*device_it, va_vec);
         } else if (arg == "terminalcontrol") {
           retval = DealTerminalControlRequest(*device_it, va_vec);
+        } else if (arg == "vehiclecontrol") {
+          retval = DealVehicleControlRequest(*device_it, va_vec);
         }
         if (retval == 0) {
           memcpy(buffer, "operation completed.", 20);

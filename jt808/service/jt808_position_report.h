@@ -85,7 +85,7 @@ union StatusBit {
     uint32_t trip_stat:2;  // 00: 空车; 01: 半载; 10: 保留; 11: 满载;
     uint32_t oilcut:1;  // 0:车辆油路正常; 1:车辆油路断开
     uint32_t circuitcut:1;  // 0:车辆电路正常; 1:车辆电路断开
-    int32_t doorlock:1;  // 0:车门解锁; 1: 车门加锁
+    uint32_t doorlock:1;  // 0:车门解锁; 1: 车门加锁
     uint32_t door1status:1;  // 0:门 1 关; 1: 门 1 开; (前门)
     uint32_t door2status:1;  // 0:门 2 关; 1: 门 2 开; (中门)
     uint32_t door3status:1;  // 0:门 3 关; 1: 门 3 开; (后门)

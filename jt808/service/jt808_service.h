@@ -84,6 +84,8 @@ class Jt808Service {
                                std::vector<std::string> &va_vec);
   int DealTerminalControlRequest(DeviceNode &device,
                                  std::vector<std::string> &va_vec);
+  int DealVehicleControlRequest(DeviceNode &device,
+                                std::vector<std::string> &va_vec);
 
   int ParseCommand(char *command);
 
