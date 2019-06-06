@@ -315,6 +315,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
   msghead_ptr->attribute.bit.encrypt = 0;
   message_flow_num_++;
   msghead_ptr->msgflownum = EndianSwap16(message_flow_num_);
+  msghead_ptr->attribute.bit.msglen = 0;
   memcpy(msghead_ptr->phone, propara.phone_num, 6);
   msghead_ptr->attribute.bit.package = 0;
   msg_body = &msg.buffer[MSGBODY_NOPACKAGE_POS];
@@ -331,7 +332,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       *msg_body = propara.respond_result;
       msg_body++;
       msg.len += 5;
-      msghead_ptr->attribute.bit.msglen = 5;
+      msghead_ptr->attribute.bit.msglen += 5;
       break;
     case DOWN_REGISTERRESPONSE:
       u16val = EndianSwap16(propara.respond_flow_num);
@@ -343,10 +344,10 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         // send authen code if register success.
         memcpy(msg_body, propara.authen_code, 4);
         msg_body += 4;
-        msghead_ptr->attribute.bit.msglen = 7;
+        msghead_ptr->attribute.bit.msglen += 7;
         msg.len += 7;
       } else {
-        msghead_ptr->attribute.bit.msglen = 3;
+        msghead_ptr->attribute.bit.msglen += 3;
         msg.len += 3;
       }
       break;
@@ -365,7 +366,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         msg_body[0] = propara.terminal_parameter_list->size();
         msg_body++;
         msg.len++;
-        msghead_ptr->attribute.bit.msglen = 1;
+        msghead_ptr->attribute.bit.msglen += 1;
         for (auto &terminal_parameter : *propara.terminal_parameter_list) {
           u32val = EndianSwap32(terminal_parameter->parameter_id);
           memcpy(msg_body, &u32val, 4);
@@ -402,7 +403,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         msg_body[0] = 0;
         msg_body++;
         msg.len++;
-        msghead_ptr->attribute.bit.msglen = 1;
+        msghead_ptr->attribute.bit.msglen += 1;
       }
       break;
     case DOWN_GETTERMPARA:
@@ -411,7 +412,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       *msg_body = propara.terminal_parameter_id_count;
       msg_body++;
       msg.len++;
-      msghead_ptr->attribute.bit.msglen = 1;
+      msghead_ptr->attribute.bit.msglen += 1;
       // deal terminal parameters id.
       for (int i = 0; i < propara.terminal_parameter_id_count; ++i) {
           memcpy(msg_body, propara.terminal_parameter_id_buffer + i*4, 4);
@@ -419,6 +420,18 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
           msg.len += 4;
           msghead_ptr->attribute.bit.msglen += 4;
       }
+      break;
+    case DOWN_GETPOSITIONINFO:
+      break;
+    case DOWN_POSITIONTRACK:
+      u16val = EndianSwap16(propara.report_interval);
+      memcpy(msg_body, &u16val, 2);
+      msg_body += 2;
+      u32val = EndianSwap32(propara.report_valid_time);
+      memcpy(msg_body, &u32val, 4);
+      msg_body += 4;
+      msg.len += 6;
+      msghead_ptr->attribute.bit.msglen += 6;
       break;
     case DOWN_UPDATEPACKAGE:
       if (propara.packet_total_num > 1) {
@@ -449,7 +462,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       memcpy(msg_body, propara.packet_data, propara.packet_data_len);
       msg_body += propara.packet_data_len;
       msg.len += propara.packet_data_len;
-      msghead_ptr->attribute.bit.msglen = 11 + propara.version_num_len +
+      msghead_ptr->attribute.bit.msglen += 11 + propara.version_num_len +
                                           propara.packet_data_len;
       break;
     case DOWN_SETCIRCULARAREA:
@@ -458,7 +471,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       *msg_body = propara.circular_area_list->size();
       msg_body++;
       msg.len += 2;
-      msghead_ptr->attribute.bit.msglen = 2;
+      msghead_ptr->attribute.bit.msglen += 2;
       for (auto circular_area : *propara.circular_area_list) {
         u32val = EndianSwap32(circular_area->area_id);
         memcpy(msg_body, &u32val, 4);
@@ -503,7 +516,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       *msg_body = propara.rectangle_area_list->size();
       msg_body++;
       msg.len += 2;
-      msghead_ptr->attribute.bit.msglen = 2;
+      msghead_ptr->attribute.bit.msglen += 2;
       for (auto rectangle_area : *propara.rectangle_area_list) {
         u32val = EndianSwap32(rectangle_area->area_id);
         memcpy(msg_body, &u32val, 4);
@@ -551,7 +564,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       *msg_body = propara.polygonal_area_list->size();
       msg_body++;
       msg.len += 2;
-      msghead_ptr->attribute.bit.msglen = 2;
+      msghead_ptr->attribute.bit.msglen += 2;
       for (auto polygonal_area : *propara.polygonal_area_list) {
         u32val = EndianSwap32(polygonal_area->area_id);
         memcpy(msg_body, &u32val, 4);
@@ -604,7 +617,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       *msg_body = propara.route_list->size();
       msg_body++;
       msg.len += 2;
-      msghead_ptr->attribute.bit.msglen = 2;
+      msghead_ptr->attribute.bit.msglen += 2;
       for (auto route : *propara.route_list) {
         u32val = EndianSwap32(route->route_id);
         memcpy(msg_body, &u32val, 4);
@@ -675,7 +688,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
     case DOWN_DELROUTE:
       *msg_body++ = propara.area_route_id_count;
       msg.len += 1;
-      msghead_ptr->attribute.bit.msglen = 1;
+      msghead_ptr->attribute.bit.msglen += 1;
       for (int i = 0; i < propara.area_route_id_count; ++i) {
         memcpy(msg_body, propara.area_route_id_buffer + i*4, 4);
         msg_body += 4;
@@ -690,7 +703,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       memcpy(msg_body, propara.pass_through->buffer,
              propara.pass_through->size);
       msg.len += propara.pass_through->size;
-      msghead_ptr->attribute.bit.msglen = propara.pass_through->size;
+      msghead_ptr->attribute.bit.msglen += propara.pass_through->size;
       break;
     default:
       break;
@@ -756,6 +769,10 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
           break;
         case DOWN_SETTERMPARA:
           printf("%s[%d]: received set terminal parameter respond: ",
+                 __FILE__, __LINE__);
+          break;
+        case DOWN_POSITIONTRACK:
+          printf("%s[%d]: received position track respond: ",
                  __FILE__, __LINE__);
           break;
         case DOWN_SETCIRCULARAREA:
@@ -906,9 +923,14 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       }
       propara.respond_result = kSuccess;
       break;
+    case UP_GETPOSITIONINFORESPONSE:
+      printf("%s[%d]: received get position info:\n", __FILE__, __LINE__);
+      ParsePositionReport(msg.buffer, msg.len, 2);
+      propara.respond_result = kSuccess;
+      break;
     case UP_POSITIONREPORT:
       printf("%s[%d]: received position report:\n", __FILE__, __LINE__);
-      ParsePositionReport(msg.buffer, msg.len);
+      ParsePositionReport(msg.buffer, msg.len, 0);
       propara.respond_result = kSuccess;
       break;
     case UP_PASSTHROUGH:
@@ -2061,6 +2083,73 @@ int Jt808Service::DealDeleteAreaRouteRequest(DeviceNode &device,
   return retval;
 }
 
+int Jt808Service::DealGetPositionInfoRequest(DeviceNode &device) {
+  int retval = -1;
+  ProtocolParameters propara = {0};
+  MessageData msg = {0};
+
+  Jt808FramePack(msg, DOWN_GETPOSITIONINFO, propara);
+  if (SendFrameData(device.socket_fd, msg)) {
+    close(device.socket_fd);
+    device.socket_fd = -1;
+  } else {
+    while (1) {
+      memset(&msg, 0x0, sizeof(msg));
+      if (RecvFrameData(device.socket_fd, msg)) {
+        close(device.socket_fd);
+        device.socket_fd = -1;
+        break;
+      } else if (msg.len > 0) {
+        if (Jt808FrameParse(msg, propara) == UP_GETPOSITIONINFORESPONSE) {
+            retval = 0;
+            break;
+        }
+      }
+    }
+  }
+  return retval;
+}
+
+int Jt808Service::DealPositionTrackRequest(DeviceNode &device,
+                                           std::vector<std::string> &va_vec) {
+  int retval = -1;
+  uint32_t u32val;
+  std::string arg;
+  ProtocolParameters propara = {0};
+  MessageData msg = {0};
+
+  arg = va_vec.back();
+  va_vec.pop_back();
+  sscanf(arg.c_str(), "%u", &u32val);
+  propara.report_interval = static_cast<uint16_t>(u32val);
+  arg = va_vec.back();
+  va_vec.pop_back();
+  sscanf(arg.c_str(), "%u", &u32val);
+  propara.report_valid_time = u32val;
+
+  Jt808FramePack(msg, DOWN_POSITIONTRACK, propara);
+  if (SendFrameData(device.socket_fd, msg)) {
+    close(device.socket_fd);
+    device.socket_fd = -1;
+  } else {
+    while (1) {
+      memset(&msg, 0x0, sizeof(msg));
+      if (RecvFrameData(device.socket_fd, msg)) {
+        close(device.socket_fd);
+        device.socket_fd = -1;
+        break;
+      } else if (msg.len > 0) {
+        if (Jt808FrameParse(msg, propara) &&
+            (propara.respond_id == DOWN_POSITIONTRACK)) {
+            retval = 0;
+            break;
+        }
+      }
+    }
+  }
+  return retval;
+}
+
 int Jt808Service::ParseCommand(char *buffer) {
   int retval = 0;
   std::string arg;
@@ -2205,6 +2294,10 @@ int Jt808Service::ParseCommand(char *buffer) {
         } else if (arg == "delroute") {
           retval = DealDeleteAreaRouteRequest(*device_it, va_vec,
                                               DOWN_DELROUTE);
+        } else if (arg == "getpositioninfo") {
+          retval = DealGetPositionInfoRequest(*device_it);
+        } else if (arg == "positiontrack") {
+          retval = DealPositionTrackRequest(*device_it, va_vec);
         }
         if (retval == 0) {
           memcpy(buffer, "operation completed.", 20);

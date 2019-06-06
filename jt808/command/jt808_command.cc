@@ -14,6 +14,8 @@ static inline void PrintUsage(void) {
          "Options:\n"
          "\tgetterminalparameter [parameterid ...]\n"
          "\tsetterminalparameter [parameterid(HEX):parametervalue ...]\n"
+         "\tgetpositioninfo\n"
+         "\tpositiontrack reportinterval reportvalidtime\n"
          "\tsetcirculararea update/append/modify [circularareaitem ...]\n"
          "\tsetrectanglearea update/append/modify [rectangleareaitem ...]\n"
          "\tsetpolygonalarea update/append/modify [polygonalareaitem ...]\n"

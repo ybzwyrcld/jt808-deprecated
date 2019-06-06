@@ -164,6 +164,6 @@ union IoStatusBit {
 
 #pragma pack(pop)
 
-void ParsePositionReport(const uint8_t *buffer, const int len);
+void ParsePositionReport(const uint8_t *buffer, const int &len, const int &offset);
 
 #endif // JT808_SERVICE_JT808_POSITION_REPORT_H_

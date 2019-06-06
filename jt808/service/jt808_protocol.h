@@ -13,16 +13,17 @@
 #include "service/jt808_terminal_parameters.h"
 
 
-#define UP_UNIRESPONSE       0x0001  // 终端通用应答
-#define UP_HEARTBEAT         0x0002  // 终端心跳
-#define UP_REGISTER          0x0100  // 终端注册
-#define UP_LOGOUT            0x0101  // 终端注销
-#define UP_AUTHENTICATION    0x0102  // 终端鉴权
-#define UP_GETPARARESPONSE   0x0104  // 查询终端参数应答
-#define UP_UPDATERESULT      0x0108  // 终端升级结果
-#define UP_POSITIONREPORT    0x0200  // 位置信息上报
-#define UP_CANBUSDATAUPLOAD  0x0705  // CAN 总线数据上传
-#define UP_PASSTHROUGH       0x0900  // 数据上行透传
+#define UP_UNIRESPONSE                  0x0001  // 终端通用应答
+#define UP_HEARTBEAT                    0x0002  // 终端心跳
+#define UP_REGISTER                     0x0100  // 终端注册
+#define UP_LOGOUT                       0x0101  // 终端注销
+#define UP_AUTHENTICATION               0x0102  // 终端鉴权
+#define UP_GETPARARESPONSE              0x0104  // 查询终端参数应答
+#define UP_UPDATERESULT                 0x0108  // 终端升级结果
+#define UP_POSITIONREPORT               0x0200  // 位置信息上报
+#define UP_GETPOSITIONINFORESPONSE      0x0201  // 位置信息查询应答
+#define UP_CANBUSDATAUPLOAD             0x0705  // CAN 总线数据上传
+#define UP_PASSTHROUGH                  0x0900  // 数据上行透传
 
 #define DOWN_UNIRESPONSE        0x8001  // 平台通用应答
 #define DOWN_REGISTERRESPONSE   0x8100  // 终端注册应答
@@ -30,6 +31,8 @@
 #define DOWN_GETTERMPARA        0x8104  // 查询终端参数
 #define DOWN_GETSPECTERMPARA    0x8106  // 查询指定终端参数
 #define DOWN_UPDATEPACKAGE      0x8108  // 下发终端升级包
+#define DOWN_GETPOSITIONINFO    0x8201  // 查询位置信息
+#define DOWN_POSITIONTRACK      0x8202  // 位置跟踪
 #define DOWN_SETCIRCULARAREA    0x8600  // 设置圆形区域
 #define DOWN_DELCIRCULARAREA    0x8601  // 删除圆形区域
 #define DOWN_SETRECTANGLEAREA   0x8602  // 设置矩形区域
@@ -98,6 +101,8 @@ struct ProtocolParameters {
   uint8_t authen_code[4];
   uint8_t version_num[32];
   uint8_t packet_data[1024];
+  uint16_t report_interval;
+  uint32_t report_valid_time;
   CanBusDataTimestamp can_bus_data_timestamp;
   PassThrough *pass_through;
   std::vector<CircularArea *> *circular_area_list;

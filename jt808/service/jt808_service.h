@@ -79,6 +79,9 @@ class Jt808Service {
   int DealDeleteAreaRouteRequest(DeviceNode &device,
                                  std::vector<std::string> &va_vec,
                                  const uint16_t &command);
+  int DealGetPositionInfoRequest(DeviceNode &device);
+  int DealPositionTrackRequest(DeviceNode &device,
+                               std::vector<std::string> &va_vec);
 
   int ParseCommand(char *command);
 
