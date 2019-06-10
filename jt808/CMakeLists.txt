@@ -1,26 +1,33 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required(VERSION 3.5.1)
 
-project (jt808service)
+project(jt808service)
 
-set (JT808_SERVICE_VERSION_MAJOR 1)
-set (JT808_SERVICE_VERSION_MINOR 0)
+set(JT808_SERVICE_VERSION_MAJOR 1)
+set(JT808_SERVICE_VERSION_MINOR 0)
 
-set (CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
-set (CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
+set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
+set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wfatal-errors")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wfatal-errors")
 
-include_directories (.)
+include_directories("${PROJECT_SOURCE_DIR}")
+include_directories("${PROJECT_BINARY_DIR}")
 
-set (SOURCEFILES
-  main.cc
-  bcd/bcd.cc
-  service/jt808_service.cc
-  service/jt808_terminal_parameters.cc
-  service/jt808_position_report.cc
-  service/jt808_util.cc
-  unix_socket/unix_socket.cc
-  )
+configure_file(
+  ${PROJECT_SOURCE_DIR}/devicelist/devices.txt
+  ${PROJECT_BINARY_DIR}/devicelist/devices.txt
+  COPYONLY
+)
 
-add_executable (jt808service ${SOURCEFILES})
+#add_subdirectory(googletest)
+add_subdirectory(service)
+add_subdirectory(bcd)
+add_subdirectory(unix_socket)
+add_subdirectory(command)
+
+add_executable(jt808service main.cc)
+
+target_link_libraries(jt808service PRIVATE
+  jt808_service
+)

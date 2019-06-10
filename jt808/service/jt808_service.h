@@ -98,7 +98,7 @@ class Jt808Service {
   }
 
  private:
-  const char *kDevicesFilePath = "./devices/devices.list";
+  const char *kDevicesFilePath = "./devicelist/devices.txt";
   const char *kCommandInterfacePath = "/tmp/jt808cmd.sock";
 
   int listen_sock_ = -1;

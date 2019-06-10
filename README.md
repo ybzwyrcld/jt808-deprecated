@@ -43,17 +43,21 @@ $ git clone https://github.com/hanoi404/jt808 && cd jt808/jt808
 $ mkdir build
 ```
 
-### 编译后台服务程序
+### 编译
 ```bash
-$ mkdir build/service && cd build/service
-$ cmake ../.. && make
+$ cmake .. && make
 ```
 
-### 编译命令行控制程序
+### 使用
+运行后台服务:
 ```bash
-$ mkdir build/command && cd build/command
-$ cmake ../../command && make
+$ ./jt808service
 ```
+控制命令:
+```bash
+$ ./command/jt808command
+```
+然后根据提示正确输入完整命令.
 
 ### 生成 debug 版和 release 版的程序
 
