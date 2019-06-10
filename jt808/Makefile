@@ -6,19 +6,29 @@ INC=-I.
 LDFLAGS=
 
 
-all: jt808service jt808command
+all: jt808service jt808terminal jt808command
 
 
-jt808service: main.o \
+jt808service: main/service_main.o \
 	bcd/bcd.o \
+	common/jt808_terminal_parameters.o \
+	common/jt808_util.o \
 	service/jt808_service.o \
-	service/jt808_terminal_parameters.o \
 	service/jt808_position_report.o \
 	service/jt808_util.o \
 	unix_socket/unix_socket.o
 	$(CC)g++ $^ -pthread -o $@
 
-jt808command: command/jt808_command.o \
+jt808terminal: main/terminal_main.o \
+	bcd/bcd.o \
+	common/jt808_terminal_parameters.o \
+	common/jt808_util.o \
+	terminal/jt808_terminal.o \
+	terminal/jt808_terminal_parameters.o \
+	terminal/jt808_area_route.o
+	$(CC)g++ $^ -o $@
+
+jt808command: main/command_main.o \
 	unix_socket/unix_socket.o
 	$(CC)g++ $^ -o $@
 
@@ -27,10 +37,10 @@ jt808command: command/jt808_command.o \
 
 
 install:
-	$(CC)strip jt808service jt808command
+	$(CC)strip jt808service jt808terminal jt808command
 
 
 clean:
-	rm -rf jt808service jt808command
-	rm -rf *.o service/*.o command/*.o bcd/*.o unix_socket/*.o
+	rm -rf jt808service jt808terminal jt808command
+	rm -rf bcd/*.o unix_socket/*.o common/*.o service/*.o terminal/*.o main/*.o
 

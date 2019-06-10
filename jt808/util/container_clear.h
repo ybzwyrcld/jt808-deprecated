@@ -7,7 +7,7 @@
 
 
 template <class T>
-static void ClearListElement(std::vector<T *> *vect) {
+static void ClearContainerElement(std::vector<T *> *vect) {
   if (vect == nullptr || vect->empty()) {
     return ;
   }
@@ -19,7 +19,7 @@ static void ClearListElement(std::vector<T *> *vect) {
 }
 
 template <class T>
-static void ClearListElement(std::vector<T *> &vect) {
+static void ClearContainerElement(std::vector<T *> &vect) {
   if (vect.empty()) {
     return ;
   }
@@ -31,7 +31,7 @@ static void ClearListElement(std::vector<T *> &vect) {
 }
 
 template <class T>
-static void ClearListElement(std::list<T *> *list) {
+static void ClearContainerElement(std::list<T *> *list) {
   if (list == nullptr || list->empty()) {
     return ;
   }
@@ -43,7 +43,7 @@ static void ClearListElement(std::list<T *> *list) {
 }
 
 template <class T>
-static void ClearListElement(std::list<T *> &list) {
+static void ClearContainerElement(std::list<T *> &list) {
   if (list.empty()) {
     return ;
   }

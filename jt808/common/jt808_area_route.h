@@ -1,5 +1,5 @@
-#ifndef JT808_SERVICE_JT808_AREA_ROUTE_H_
-#define JT808_SERVICE_JT808_AREA_ROUTE_H_
+#ifndef JT808_COMMON_JT808_AREA_ROUTE_H_
+#define JT808_COMMON_JT808_AREA_ROUTE_H_
 
 #include <stdint.h>
 
@@ -131,4 +131,4 @@ struct Route {
 
 #pragma pack(pop)
 
-#endif // JT808_SERVICE_JT808_AREA_ROUTE_H_
+#endif // JT808_COMMON_JT808_AREA_ROUTE_H_

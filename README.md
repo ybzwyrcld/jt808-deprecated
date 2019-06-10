@@ -53,9 +53,13 @@ $ cmake .. && make
 ```bash
 $ ./jt808service
 ```
-控制命令:
+运行终端:
 ```bash
-$ ./command/jt808command
+$ ./jt808terminal
+```
+使用命令行控制工具:
+```bash
+$ ./jt808command
 ```
 然后根据提示正确输入完整命令.
 

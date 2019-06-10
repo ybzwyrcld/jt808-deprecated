@@ -6,9 +6,9 @@
 
 union VehicleControlFlag {
   struct Bit {
-      uint8_t doorlock:1;  // 0:车门解锁; 1: 车门加锁
-      uint8_t retain:7;
-    }bit;
+    uint8_t doorlock:1;  // 0:车门解锁; 1: 车门加锁
+    uint8_t retain:7;
+  }bit;
   uint8_t value;
 };
 

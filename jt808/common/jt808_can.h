@@ -1,5 +1,5 @@
-#ifndef JT808_SERVICE_JT808_CAN_H_
-#define JT808_SERVICE_JT808_CAN_H_
+#ifndef JT808_COMMON_JT808_CAN_H_
+#define JT808_COMMON_JT808_CAN_H_
 
 #include <stdint.h>
 
@@ -22,11 +22,11 @@ struct CanBusDataTimestamp {
   uint16_t millisecond;
 };
 
-struct CanBusDataItem {
+struct CanBusData {
   CanIdBit can_id;
   uint8_t buffer[8];
 };
 
 #pragma pack(pop)
 
-#endif // JT808_SERVICE_JT808_CAN_H_
+#endif // JT808_COMMON_JT808_CAN_H_

@@ -38,13 +38,13 @@ class Jt808Service {
 
   void Run(const int &time_out);
 
-  int SendFrameData(const int &fd, const MessageData &msg);
-  int RecvFrameData(const int &fd, MessageData &msg);
+  int SendFrameData(const int &fd, const Message &msg);
+  int RecvFrameData(const int &fd, Message &msg);
 
-  int Jt808FramePack(MessageData &msg, const uint16_t &command,
+  int Jt808FramePack(Message &msg, const uint16_t &command,
                      const ProtocolParameters &propara);
 
-  uint16_t Jt808FrameParse(MessageData &msg, ProtocolParameters &propara);
+  uint16_t Jt808FrameParse(Message &msg, ProtocolParameters &propara);
 
   int DealGetStartupRequest(DeviceNode &device, char *result);
   int DealSetStartupRequest(DeviceNode &device,

@@ -1,7 +1,8 @@
-#ifndef JT808_SERVICE_JT808_PASSTHROUGH_H_
-#define JT808_SERVICE_JT808_PASSTHROUGH_H_
+#ifndef JT808_COMMON_JT808_PASSTHROUGH_H_
+#define JT808_COMMON_JT808_PASSTHROUGH_H_
 
 #include <stdint.h>
+
 
 // GNSS 模块详细定位数据
 #define PASSTHROUGH_GNSSRAW      0x00
@@ -19,10 +20,10 @@
 
 struct PassThrough {
   uint8_t type;
-  uint32_t size;
   uint8_t buffer[1023];
+  uint32_t size;
 };
 
 #pragma pack(pop)
 
-#endif // JT808_SERVICE_JT808_PASSTHROUGH_H_
+#endif // JT808_COMMON_JT808_PASSTHROUGH_H_

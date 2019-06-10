@@ -1,4 +1,4 @@
-#include "service/jt808_terminal_parameters.h"
+#include "common/jt808_terminal_parameters.h"
 
 #include <string.h>
 #include <algorithm>

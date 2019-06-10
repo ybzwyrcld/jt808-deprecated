@@ -2,16 +2,8 @@ add_library(jt808_position_report STATIC
   jt808_position_report.cc
 )
 
-add_library(jt808_util STATIC
+add_library(service_jt808_util STATIC
   jt808_util.cc
-)
-
-add_library(terminal_parameter STATIC
-  jt808_terminal_parameters.cc
-)
-
-target_link_libraries(terminal_parameter PRIVATE
-  bcd
 )
 
 add_library(jt808_service STATIC
@@ -20,10 +12,11 @@ add_library(jt808_service STATIC
 
 target_link_libraries(jt808_service PRIVATE
   bcd
-  jt808_position_report
-  terminal_parameter
   unix_socket
-  jt808_util
+  jt808_position_report
+  common_jt808_util
+  common_terminal_parameter
+  service_jt808_util
 )
 
 #add_executable(jt808_test

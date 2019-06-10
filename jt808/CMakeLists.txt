@@ -21,13 +21,27 @@ configure_file(
 )
 
 #add_subdirectory(googletest)
-add_subdirectory(service)
 add_subdirectory(bcd)
 add_subdirectory(unix_socket)
-add_subdirectory(command)
 
-add_executable(jt808service main.cc)
+add_subdirectory(common)
+add_subdirectory(terminal)
+add_subdirectory(service)
+
+add_executable(jt808service main/service_main.cc)
 
 target_link_libraries(jt808service PRIVATE
   jt808_service
+)
+
+add_executable(jt808terminal main/terminal_main.cc)
+
+target_link_libraries(jt808terminal PRIVATE
+  jt808_terminal
+)
+
+add_executable(jt808command main/command_main.cc)
+
+target_link_libraries(jt808command PRIVATE
+  unix_socket
 )

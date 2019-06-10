@@ -56,3 +56,17 @@ char *StringFromBcdCompress(const char *src, char *dst, const int &srclen) {
   return dst;
 }
 
+char *StringFromBcdCompressFillingZero(const char *src,
+                                       char *dst, const int &srclen) {
+  char *ptr = dst;
+  char temp;
+  int cnt = srclen;
+
+  while (cnt--) {
+    temp = HexFromBcd(*src);
+    *ptr++ = temp/10 + '0';
+    *ptr++ = temp%10 + '0';
+    ++src;
+  }
+  return dst;
+}

@@ -118,7 +118,7 @@ int Jt808Service::AcceptNewClient(void) {
   char phone_num[6] = {0};
   decltype (device_list_.begin()) device_it;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   memset(&client_addr, 0, sizeof(struct sockaddr_in));
   socklen_t clilen = sizeof(struct sockaddr);
@@ -142,7 +142,7 @@ int Jt808Service::AcceptNewClient(void) {
     switch (command) {
       case UP_REGISTER:
         memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-        msg.len = Jt808FramePack(msg, DOWN_REGISTERRESPONSE, propara);
+        msg.size = Jt808FramePack(msg, DOWN_REGISTERRESPONSE, propara);
         SendFrameData(new_sock, msg);
         if (propara.respond_result != kSuccess) {
           close(new_sock);
@@ -160,7 +160,7 @@ int Jt808Service::AcceptNewClient(void) {
         }
       case UP_AUTHENTICATION:
         memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-        msg.len = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
+        msg.size = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
         SendFrameData(new_sock, msg);
         if (propara.respond_result != kSuccess) {
           close(new_sock);
@@ -197,7 +197,7 @@ void Jt808Service::Run(const int &time_out) {
   int active_count;
   char recv_buff[65536] = {0};
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   while (1) {
     ret = Jt808ServiceWait(time_out);
@@ -232,7 +232,7 @@ void Jt808Service::Run(const int &time_out) {
                 switch (cmd) {
                   case UP_UPDATERESULT: case UP_POSITIONREPORT:
                     memset(msg.buffer, 0x0, sizeof(msg.buffer));
-                    msg.len = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
+                    msg.size = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
                     if (SendFrameData(epoll_events_[i].data.fd, msg)) {
                       close(epoll_events_[i].data.fd);
                       device.socket_fd = -1;
@@ -254,11 +254,11 @@ void Jt808Service::Run(const int &time_out) {
   }
 }
 
-int Jt808Service::SendFrameData(const int &fd, const MessageData &msg) {
+int Jt808Service::SendFrameData(const int &fd, const Message &msg) {
   int ret = -1;
 
   signal(SIGPIPE, SIG_IGN);
-  ret = send(fd, msg.buffer, msg.len, 0);
+  ret = send(fd, msg.buffer, msg.size, 0);
   if (ret < 0) {
     if ((errno == EAGAIN) || (errno == EWOULDBLOCK) || (errno == EINTR)) {
       ret = 0;
@@ -277,7 +277,7 @@ int Jt808Service::SendFrameData(const int &fd, const MessageData &msg) {
   return ret >= 0 ? 0 : ret;
 }
 
-int Jt808Service::RecvFrameData(const int &fd, MessageData &msg) {
+int Jt808Service::RecvFrameData(const int &fd, Message &msg) {
   int ret = -1;
 
   memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
@@ -289,19 +289,19 @@ int Jt808Service::RecvFrameData(const int &fd, MessageData &msg) {
       ret = -1;
       printf("%s[%d]: recv data failed!!!\n", __FILE__, __LINE__);
     }
-    msg.len = 0;
+    msg.size = 0;
   } else if (ret == 0) {
     ret = -1;
-    msg.len = 0;
+    msg.size = 0;
     printf("%s[%d]: connection disconect!!!\n", __FILE__, __LINE__);
   } else {
-    msg.len = ret;
+    msg.size = ret;
   }
 
   return ret >= 0 ? 0 : ret;
 }
 
-int Jt808Service::Jt808FramePack(MessageData &msg,
+int Jt808Service::Jt808FramePack(Message &msg,
                                  const uint16_t &command,
                                  const ProtocolParameters &propara) {
   uint8_t *msg_body;
@@ -311,7 +311,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
 
   msghead_ptr = reinterpret_cast<MessageHead *>(&msg.buffer[1]);
   msghead_ptr->id = EndianSwap16(command);
-  msghead_ptr->attribute.val = 0;
+  msghead_ptr->attribute.value = 0;
   msghead_ptr->attribute.bit.encrypt = 0;
   message_flow_num_++;
   msghead_ptr->msgflownum = EndianSwap16(message_flow_num_);
@@ -319,7 +319,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
   memcpy(msghead_ptr->phone, propara.phone_num, 6);
   msghead_ptr->attribute.bit.package = 0;
   msg_body = &msg.buffer[MSGBODY_NOPACKAGE_POS];
-  msg.len = 13;
+  msg.size = 13;
 
   switch (command) {
     case DOWN_UNIRESPONSE:
@@ -331,7 +331,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msg_body += 2;
       *msg_body = propara.respond_result;
       msg_body++;
-      msg.len += 5;
+      msg.size += 5;
       msghead_ptr->attribute.bit.msglen += 5;
       break;
     case DOWN_REGISTERRESPONSE:
@@ -345,10 +345,10 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         memcpy(msg_body, propara.authen_code, 4);
         msg_body += 4;
         msghead_ptr->attribute.bit.msglen += 7;
-        msg.len += 7;
+        msg.size += 7;
       } else {
         msghead_ptr->attribute.bit.msglen += 3;
-        msg.len += 3;
+        msg.size += 3;
       }
       break;
     case DOWN_SETTERMPARA:
@@ -359,13 +359,13 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         u16val = EndianSwap16(propara.packet_sequence_num);
         memcpy(&msg.buffer[15], &u16val, 2);
         msg_body += 4;
-        msg.len += 4;
+        msg.size += 4;
       }
       if ((propara.terminal_parameter_list != nullptr) &&
           !propara.terminal_parameter_list->empty()) {
         msg_body[0] = propara.terminal_parameter_list->size();
         msg_body++;
-        msg.len++;
+        msg.size++;
         msghead_ptr->attribute.bit.msglen += 1;
         for (auto &terminal_parameter : *propara.terminal_parameter_list) {
           u32val = EndianSwap32(terminal_parameter->parameter_id);
@@ -395,14 +395,14 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
               break;
           }
           msg_body += terminal_parameter->parameter_len;
-          msg.len += 5 + terminal_parameter->parameter_len;
+          msg.size += 5 + terminal_parameter->parameter_len;
           msghead_ptr->attribute.bit.msglen +=
                5 + terminal_parameter->parameter_len;
         }
       } else {
         msg_body[0] = 0;
         msg_body++;
-        msg.len++;
+        msg.size++;
         msghead_ptr->attribute.bit.msglen += 1;
       }
       break;
@@ -411,20 +411,20 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
     case DOWN_GETSPECTERMPARA:
       *msg_body = propara.terminal_parameter_id_count;
       msg_body++;
-      msg.len++;
+      msg.size++;
       msghead_ptr->attribute.bit.msglen += 1;
       // deal terminal parameters id.
       for (int i = 0; i < propara.terminal_parameter_id_count; ++i) {
           memcpy(msg_body, propara.terminal_parameter_id_buffer + i*4, 4);
           msg_body += 4;
-          msg.len += 4;
+          msg.size += 4;
           msghead_ptr->attribute.bit.msglen += 4;
       }
       break;
     case DOWN_TERMINALCONTROL:
       *msg_body = propara.terminal_control_type;
       msg_body++;
-      msg.len++;
+      msg.size++;
       msghead_ptr->attribute.bit.msglen += 1;
       break;
     case DOWN_UPDATEPACKAGE:
@@ -435,27 +435,27 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         u16val = EndianSwap16(propara.packet_sequence_num);
         memcpy(&msg.buffer[15], &u16val, 2);
         msg_body += 4;
-        msg.len += 4;
+        msg.size += 4;
       }
       *msg_body = propara.upgrade_type;
       msg_body++;
       memcpy(msg_body, propara.manufacturer_id, 5);
       msg_body += 5;
-      msg.len += 6;
+      msg.size += 6;
       *msg_body = propara.version_num_len;
       msg_body++;
-      msg.len++;
+      msg.size++;
       memcpy(msg_body, propara.version_num, propara.version_num_len);
       msg_body += propara.version_num_len;
-      msg.len += propara.version_num_len;
+      msg.size += propara.version_num_len;
       u32val = EndianSwap32(propara.packet_data_len);
       memcpy(msg_body, &u32val, 4);
       msg_body += 4;
-      msg.len += 4;
+      msg.size += 4;
       // content of the upgrade file.
       memcpy(msg_body, propara.packet_data, propara.packet_data_len);
       msg_body += propara.packet_data_len;
-      msg.len += propara.packet_data_len;
+      msg.size += propara.packet_data_len;
       msghead_ptr->attribute.bit.msglen += 11 + propara.version_num_len +
                                           propara.packet_data_len;
       break;
@@ -468,13 +468,13 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       u32val = EndianSwap32(propara.report_valid_time);
       memcpy(msg_body, &u32val, 4);
       msg_body += 4;
-      msg.len += 6;
+      msg.size += 6;
       msghead_ptr->attribute.bit.msglen += 6;
       break;
     case DOWN_VEHICLECONTROL:
       *msg_body = propara.vehicle_control_flag.value;
       msg_body++;
-      msg.len++;
+      msg.size++;
       msghead_ptr->attribute.bit.msglen++;
       break;
     case DOWN_SETCIRCULARAREA:
@@ -482,7 +482,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msg_body++;
       *msg_body = propara.circular_area_list->size();
       msg_body++;
-      msg.len += 2;
+      msg.size += 2;
       msghead_ptr->attribute.bit.msglen += 2;
       for (auto circular_area : *propara.circular_area_list) {
         u32val = EndianSwap32(circular_area->area_id);
@@ -500,14 +500,14 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         u32val = EndianSwap32(circular_area->radius);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
-        msg.len += 18;
+        msg.size += 18;
         msghead_ptr->attribute.bit.msglen += 18;
         if (circular_area->area_attribute.bit.bytime) {
           memcpy(msg_body, circular_area->start_time, 6);
           msg_body += 6;
           memcpy(msg_body, circular_area->end_time, 6);
           msg_body += 6;
-          msg.len += 12;
+          msg.size += 12;
           msghead_ptr->attribute.bit.msglen += 12;
         }
         if (circular_area->area_attribute.bit.speedlimit) {
@@ -515,11 +515,11 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
           memcpy(msg_body, &u16val, 2);
           msg_body += 2;
           *msg_body++ = circular_area->overspeed_duration;
-          msg.len += 3;
+          msg.size += 3;
           msghead_ptr->attribute.bit.msglen += 3;
         }
       }
-      ClearListElement(propara.circular_area_list);
+      ClearContainerElement(propara.circular_area_list);
       delete propara.circular_area_list;
       break;
     case DOWN_SETRECTANGLEAREA:
@@ -527,7 +527,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msg_body++;
       *msg_body = propara.rectangle_area_list->size();
       msg_body++;
-      msg.len += 2;
+      msg.size += 2;
       msghead_ptr->attribute.bit.msglen += 2;
       for (auto rectangle_area : *propara.rectangle_area_list) {
         u32val = EndianSwap32(rectangle_area->area_id);
@@ -548,14 +548,14 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         u32val = EndianSwap32(rectangle_area->bottom_right_corner.longitude);
         memcpy(msg_body, &u32val, 4);
         msg_body += 4;
-        msg.len += 22;
+        msg.size += 22;
         msghead_ptr->attribute.bit.msglen += 12;
         if (rectangle_area->area_attribute.bit.bytime) {
           memcpy(msg_body, rectangle_area->start_time, 6);
           msg_body += 6;
           memcpy(msg_body, rectangle_area->end_time, 6);
           msg_body += 6;
-          msg.len += 12;
+          msg.size += 12;
           msghead_ptr->attribute.bit.msglen += 12;
         }
         if (rectangle_area->area_attribute.bit.speedlimit) {
@@ -563,11 +563,11 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
           memcpy(msg_body, &u16val, 2);
           msg_body += 2;
           *msg_body++ = rectangle_area->overspeed_duration;
-          msg.len += 3;
+          msg.size += 3;
           msghead_ptr->attribute.bit.msglen += 3;
         }
       }
-      ClearListElement(propara.rectangle_area_list);
+      ClearContainerElement(propara.rectangle_area_list);
       delete propara.rectangle_area_list;
       break;
     case DOWN_SETPOLYGONALAREA:
@@ -575,7 +575,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msg_body++;
       *msg_body = propara.polygonal_area_list->size();
       msg_body++;
-      msg.len += 2;
+      msg.size += 2;
       msghead_ptr->attribute.bit.msglen += 2;
       for (auto polygonal_area : *propara.polygonal_area_list) {
         u32val = EndianSwap32(polygonal_area->area_id);
@@ -584,14 +584,14 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         u16val = EndianSwap16(polygonal_area->area_attribute.value);
         memcpy(msg_body, &u16val, 2);
         msg_body += 2;
-        msg.len += 6;
+        msg.size += 6;
         msghead_ptr->attribute.bit.msglen += 6;
         if (polygonal_area->area_attribute.bit.bytime) {
           memcpy(msg_body, polygonal_area->start_time, 6);
           msg_body += 6;
           memcpy(msg_body, polygonal_area->end_time, 6);
           msg_body += 6;
-          msg.len += 12;
+          msg.size += 12;
           msghead_ptr->attribute.bit.msglen += 12;
         }
         if (polygonal_area->area_attribute.bit.speedlimit) {
@@ -599,13 +599,13 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
           memcpy(msg_body, &u16val, 2);
           msg_body += 2;
           *msg_body++ = polygonal_area->overspeed_duration;
-          msg.len += 3;
+          msg.size += 3;
           msghead_ptr->attribute.bit.msglen += 3;
         }
         u16val = EndianSwap16(polygonal_area->coordinate_count);
         memcpy(msg_body, &u16val, 2);
         msg_body += 2;
-        msg.len += 2;
+        msg.size += 2;
         msghead_ptr->attribute.bit.msglen += 2;
         for (auto coordinate : *polygonal_area->coordinate_list) {
           u32val = EndianSwap32(coordinate->latitude);
@@ -614,13 +614,13 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
           u32val = EndianSwap32(coordinate->longitude);
           memcpy(msg_body, &u32val, 4);
           msg_body += 4;
-          msg.len += 8;
+          msg.size += 8;
           msghead_ptr->attribute.bit.msglen += 8;
         }
-        ClearListElement(polygonal_area->coordinate_list);
+        ClearContainerElement(polygonal_area->coordinate_list);
         delete polygonal_area->coordinate_list;
       }
-      ClearListElement(propara.polygonal_area_list);
+      ClearContainerElement(propara.polygonal_area_list);
       delete propara.polygonal_area_list;
       break;
     case DOWN_SETROUTE:
@@ -628,7 +628,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
       msg_body++;
       *msg_body = propara.route_list->size();
       msg_body++;
-      msg.len += 2;
+      msg.size += 2;
       msghead_ptr->attribute.bit.msglen += 2;
       for (auto route : *propara.route_list) {
         u32val = EndianSwap32(route->route_id);
@@ -637,20 +637,20 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
         u16val = EndianSwap16(route->route_attribute.value);
         memcpy(msg_body, &u16val, 2);
         msg_body += 2;
-        msg.len += 6;
+        msg.size += 6;
         msghead_ptr->attribute.bit.msglen += 6;
         if (route->route_attribute.bit.bytime) {
           memcpy(msg_body, route->start_time, 6);
           msg_body += 6;
           memcpy(msg_body, route->end_time, 6);
           msg_body += 6;
-          msg.len += 12;
+          msg.size += 12;
           msghead_ptr->attribute.bit.msglen += 12;
         }
         u16val = EndianSwap16(route->inflection_point_count);
         memcpy(msg_body, &u16val, 2);
         msg_body += 2;
-        msg.len += 2;
+        msg.size += 2;
         msghead_ptr->attribute.bit.msglen += 2;
         for (auto inflection_point : *route->inflection_point_list) {
           u32val = EndianSwap32(inflection_point->inflection_point_id);
@@ -667,7 +667,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
           msg_body += 4;
           *msg_body++ = inflection_point->road_section_wide;
           *msg_body++ = inflection_point->road_section_attribute.value;
-          msg.len += 18;
+          msg.size += 18;
           msghead_ptr->attribute.bit.msglen += 18;
           if (inflection_point->road_section_attribute.bit.traveltime) {
             u16val = EndianSwap16(inflection_point->max_driving_time);
@@ -676,7 +676,7 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
             u16val = EndianSwap16(inflection_point->min_driving_time);
             memcpy(msg_body, &u16val, 2);
             msg_body += 2;
-            msg.len += 4;
+            msg.size += 4;
             msghead_ptr->attribute.bit.msglen += 4;
           }
           if (inflection_point->road_section_attribute.bit.speedlimit) {
@@ -684,14 +684,14 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
             memcpy(msg_body, &u16val, 2);
             msg_body += 2;
             *msg_body++ = inflection_point->overspeed_duration;
-            msg.len += 3;
+            msg.size += 3;
             msghead_ptr->attribute.bit.msglen += 3;
           }
         }
-        ClearListElement(route->inflection_point_list);
+        ClearContainerElement(route->inflection_point_list);
         delete route->inflection_point_list;
       }
-      ClearListElement(propara.route_list);
+      ClearContainerElement(propara.route_list);
       delete propara.route_list;
       break;
     case DOWN_DELCIRCULARAREA:
@@ -699,47 +699,47 @@ int Jt808Service::Jt808FramePack(MessageData &msg,
     case DOWN_DELPOLYGONALAREA:
     case DOWN_DELROUTE:
       *msg_body++ = propara.area_route_id_count;
-      msg.len += 1;
+      msg.size += 1;
       msghead_ptr->attribute.bit.msglen += 1;
       for (int i = 0; i < propara.area_route_id_count; ++i) {
         memcpy(msg_body, propara.area_route_id_buffer + i*4, 4);
         msg_body += 4;
-        msg.len += 4;
+        msg.size += 4;
         msghead_ptr->attribute.bit.msglen += 4;
       }
       break;
     case DOWN_PASSTHROUGH:
       *msg_body = propara.pass_through->type;
       msg_body++;
-      msg.len++;
+      msg.size++;
       memcpy(msg_body, propara.pass_through->buffer,
              propara.pass_through->size);
-      msg.len += propara.pass_through->size;
+      msg.size += propara.pass_through->size;
       msghead_ptr->attribute.bit.msglen += propara.pass_through->size;
       break;
     default:
       break;
   }
-  u16val = msghead_ptr->attribute.val;
-  msghead_ptr->attribute.val = EndianSwap16(u16val);
+  u16val = msghead_ptr->attribute.value;
+  msghead_ptr->attribute.value = EndianSwap16(u16val);
 
-  *msg_body = BccCheckSum(&msg.buffer[1], msg.len - 1);
-  msg.len++;
+  *msg_body = BccCheckSum(&msg.buffer[1], msg.size - 1);
+  msg.size++;
 
-  msg.len = Escape(msg.buffer + 1, msg.len);
+  msg.size = Escape(msg.buffer + 1, msg.size);
   msg.buffer[0] = PROTOCOL_SIGN;
-  msg.buffer[msg.len++] = PROTOCOL_SIGN;
+  msg.buffer[msg.size++] = PROTOCOL_SIGN;
 
   printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
-  for (uint16_t i = 0; i < msg.len; ++i) {
+  for (uint16_t i = 0; i < msg.size; ++i) {
     printf("%02X ", msg.buffer[i]);
   }
   printf("\r\n");
 
-  return msg.len;
+  return msg.size;
 }
 
-uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
+uint16_t Jt808Service::Jt808FrameParse(Message &msg,
                                        ProtocolParameters &propara) {
   uint8_t *msg_body;
   char phone_num[12] = {0};
@@ -750,15 +750,15 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
   MessageBodyAttr msgbody_attribute;
 
   // printf("%s[%d]: socket-recv:\n", __FILE__, __LINE__);
-  // for (uint16_t i = 0; i < msg.len; ++i) {
+  // for (uint16_t i = 0; i < msg.size; ++i) {
   //   printf("%02X ", msg.buffer[i]);
   // }
   // printf("\r\n");
 
-  msg.len = ReverseEscape(&msg.buffer[1], msg.len);
+  msg.size = ReverseEscape(&msg.buffer[1], msg.size);
   msghead_ptr = reinterpret_cast<MessageHead *>(&msg.buffer[1]);
-  msgbody_attribute.val = msghead_ptr->attribute.val;
-  msgbody_attribute.val = EndianSwap16(msgbody_attribute.val);
+  u16val = msghead_ptr->attribute.value;
+  msgbody_attribute.value = EndianSwap16(u16val);
   if (msgbody_attribute.bit.package) {
     msg_body = &msg.buffer[MSGBODY_PACKAGE_POS];
   } else {
@@ -816,12 +816,10 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
                  __FILE__, __LINE__);
           break;
         case DOWN_SETROUTE:
-          printf("%s[%d]: received set route respond: ",
-                 __FILE__, __LINE__);
+          printf("%s[%d]: received set route respond: ", __FILE__, __LINE__);
           break;
         case DOWN_DELROUTE:
-          printf("%s[%d]: received delete route respond: ",
-                 __FILE__, __LINE__);
+          printf("%s[%d]: received delete route respond: ", __FILE__, __LINE__);
           break;
         case DOWN_PASSTHROUGH:
           printf("%s[%d]: received down passthrough respond: ",
@@ -941,17 +939,17 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       break;
     case UP_GETPOSITIONINFORESPONSE:
       printf("%s[%d]: received get position info:\n", __FILE__, __LINE__);
-      ParsePositionReport(msg.buffer, msg.len, 2);
+      ParsePositionReport(msg.buffer, msg.size, 2);
       propara.respond_result = kSuccess;
       break;
     case UP_POSITIONREPORT:
       printf("%s[%d]: received position report:\n", __FILE__, __LINE__);
-      ParsePositionReport(msg.buffer, msg.len, 0);
+      ParsePositionReport(msg.buffer, msg.size, 0);
       propara.respond_result = kSuccess;
       break;
     case UP_VEHICLECONTROLRESPONSE:
       printf("%s[%d]: received vehicle control:\n", __FILE__, __LINE__);
-      ParsePositionReport(msg.buffer, msg.len, 2);
+      ParsePositionReport(msg.buffer, msg.size, 2);
       propara.respond_result = kSuccess;
       break;
     case UP_PASSTHROUGH:
@@ -969,8 +967,8 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
       break;
     case UP_CANBUSDATAUPLOAD:
       printf("%s[%d]: received up can bus data:\n", __FILE__, __LINE__);
-      if (propara.can_bus_data_item_list == nullptr) {
-        propara.can_bus_data_item_list = new std::vector<CanBusDataItem *>;
+      if (propara.can_bus_data_list == nullptr) {
+        propara.can_bus_data_list = new std::vector<CanBusData*>;
       }
       memcpy(&u16val, &msg_body[0], 2);
       msg_body += 2;
@@ -989,24 +987,24 @@ uint16_t Jt808Service::Jt808FrameParse(MessageData &msg,
         u16val += u8val;
         propara.can_bus_data_timestamp.millisecond = u16val;
         msg_body += 5;
-        CanBusDataItem *item;
+        CanBusData *item;
         while (max_item_count--) {
-          item = new CanBusDataItem;
+          item = new CanBusData;
           memcpy(&(item->can_id), &msg_body[0], 4);
           msg_body += 4;
           memcpy(item->buffer, &msg_body[0], 8);
           msg_body += 8;
-          propara.can_bus_data_item_list->push_back(item);
+          propara.can_bus_data_list->push_back(item);
         }
         fprintf(stdout, "\tcount: %lu\n"
                         "\ttimestamp: %02d:%02d:%02d%04d\n",
-                propara.can_bus_data_item_list->size(),
+                propara.can_bus_data_list->size(),
                 propara.can_bus_data_timestamp.hour,
                 propara.can_bus_data_timestamp.minute,
                 propara.can_bus_data_timestamp.second,
                 propara.can_bus_data_timestamp.millisecond);
-        ClearListElement(propara.can_bus_data_item_list);
-        delete propara.can_bus_data_item_list;
+        ClearContainerElement(propara.can_bus_data_list);
+        delete propara.can_bus_data_list;
       }
       break;
     default:
@@ -1477,7 +1475,7 @@ int Jt808Service::DealGetTerminalParameterRequest(
   uint32_t parameter_id;
   std::string arg;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   PreparePhoneNum(device.phone_num, propara.phone_num);
   propara.terminal_parameter_id_count = 0;
@@ -1510,7 +1508,7 @@ int Jt808Service::DealGetTerminalParameterRequest(
         close(device.socket_fd);
         device.socket_fd = -1;
         break;
-      } else if (msg.len > 0) {
+      } else if (msg.size > 0) {
         if (Jt808FrameParse(msg, propara) == UP_GETPARARESPONSE) {
           memset(&msg, 0x0, sizeof(msg));
           Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
@@ -1548,7 +1546,7 @@ int Jt808Service::DealGetTerminalParameterRequest(
       }
     }
   }
-  ClearListElement(propara.terminal_parameter_list);
+  ClearContainerElement(propara.terminal_parameter_list);
   delete propara.terminal_parameter_list;
   return retval;
 }
@@ -1565,7 +1563,7 @@ int Jt808Service::DealSetTerminalParameterRequest(
   uint32_t parameter_id = 0;
   std::string arg;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   auto va_it = va_vec.begin();
   while (va_it != va_vec.end()) {
@@ -1628,14 +1626,14 @@ int Jt808Service::DealSetTerminalParameterRequest(
         close(device.socket_fd);
         device.socket_fd = -1;
         break;
-      } else if (msg.len > 0) {
+      } else if (msg.size > 0) {
         if (Jt808FrameParse(msg, propara) &&
             (propara.respond_id == DOWN_SETTERMPARA)) {
           break;
         }
       }
     }
-    ClearListElement(propara.terminal_parameter_list);
+    ClearContainerElement(propara.terminal_parameter_list);
     delete propara.terminal_parameter_list;
     if (va_vec.empty()) {
       break;
@@ -1656,7 +1654,7 @@ int Jt808Service::DealSetCircularAreaRequest(
 
   std::string arg;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   propara.circular_area_list = new std::vector<CircularArea*>;
   arg = va_vec.back();
@@ -1726,7 +1724,7 @@ int Jt808Service::DealSetCircularAreaRequest(
       close(device.socket_fd);
       device.socket_fd = -1;
       break;
-    } else if (msg.len > 0) {
+    } else if (msg.size > 0) {
       if (Jt808FrameParse(msg, propara) &&
           (propara.respond_id == DOWN_SETCIRCULARAREA)) {
         break;
@@ -1745,7 +1743,7 @@ int Jt808Service::DealSetRectangleAreaRequest(
 
   std::string arg;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   propara.rectangle_area_list = new std::vector<RectangleArea*>;
   arg = va_vec.back();
@@ -1824,7 +1822,7 @@ int Jt808Service::DealSetRectangleAreaRequest(
       close(device.socket_fd);
       device.socket_fd = -1;
       break;
-    } else if (msg.len > 0) {
+    } else if (msg.size > 0) {
       if (Jt808FrameParse(msg, propara) &&
           (propara.respond_id == DOWN_SETRECTANGLEAREA)) {
         break;
@@ -1843,7 +1841,7 @@ int Jt808Service::DealSetPolygonalAreaRequest(
 
   std::string arg;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   propara.polygonal_area_list = new std::vector<PolygonalArea*>;
   arg = va_vec.back();
@@ -1920,7 +1918,7 @@ int Jt808Service::DealSetPolygonalAreaRequest(
       close(device.socket_fd);
       device.socket_fd = -1;
       break;
-    } else if (msg.len > 0) {
+    } else if (msg.size > 0) {
       if (Jt808FrameParse(msg, propara) &&
           (propara.respond_id == DOWN_SETPOLYGONALAREA)) {
         break;
@@ -1939,7 +1937,7 @@ int Jt808Service::DealSetRouteRequest(DeviceNode &device,
 
   std::string arg;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   propara.route_list = new std::vector<Route*>;
   arg = va_vec.back();
@@ -2045,7 +2043,7 @@ int Jt808Service::DealSetRouteRequest(DeviceNode &device,
       close(device.socket_fd);
       device.socket_fd = -1;
       break;
-    } else if (msg.len > 0) {
+    } else if (msg.size > 0) {
       if (Jt808FrameParse(msg, propara) &&
           (propara.respond_id == DOWN_SETROUTE)) {
         break;
@@ -2063,7 +2061,7 @@ int Jt808Service::DealDeleteAreaRouteRequest(DeviceNode &device,
   uint32_t area_route_id;
   std::string arg;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   PreparePhoneNum(device.phone_num, propara.phone_num);
   propara.area_route_id_count = 0;
@@ -2093,7 +2091,7 @@ int Jt808Service::DealDeleteAreaRouteRequest(DeviceNode &device,
         close(device.socket_fd);
         device.socket_fd = -1;
         break;
-      } else if (msg.len > 0) {
+      } else if (msg.size > 0) {
         if (Jt808FrameParse(msg, propara) && (propara.respond_id == command)) {
             retval = 0;
             break;
@@ -2107,7 +2105,7 @@ int Jt808Service::DealDeleteAreaRouteRequest(DeviceNode &device,
 int Jt808Service::DealGetPositionInfoRequest(DeviceNode &device) {
   int retval = -1;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   Jt808FramePack(msg, DOWN_GETPOSITIONINFO, propara);
   if (SendFrameData(device.socket_fd, msg)) {
@@ -2120,7 +2118,7 @@ int Jt808Service::DealGetPositionInfoRequest(DeviceNode &device) {
         close(device.socket_fd);
         device.socket_fd = -1;
         break;
-      } else if (msg.len > 0) {
+      } else if (msg.size > 0) {
         if (Jt808FrameParse(msg, propara) == UP_GETPOSITIONINFORESPONSE) {
             retval = 0;
             break;
@@ -2137,7 +2135,7 @@ int Jt808Service::DealPositionTrackRequest(DeviceNode &device,
   uint32_t u32val;
   std::string arg;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   arg = va_vec.back();
   va_vec.pop_back();
@@ -2159,7 +2157,7 @@ int Jt808Service::DealPositionTrackRequest(DeviceNode &device,
         close(device.socket_fd);
         device.socket_fd = -1;
         break;
-      } else if (msg.len > 0) {
+      } else if (msg.size > 0) {
         if (Jt808FrameParse(msg, propara) &&
             (propara.respond_id == DOWN_POSITIONTRACK)) {
             retval = 0;
@@ -2177,7 +2175,7 @@ int Jt808Service::DealTerminalControlRequest(DeviceNode &device,
   uint32_t u32val;
   std::string arg;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   arg = va_vec.back();
   va_vec.pop_back();
@@ -2195,7 +2193,7 @@ int Jt808Service::DealTerminalControlRequest(DeviceNode &device,
         close(device.socket_fd);
         device.socket_fd = -1;
         break;
-      } else if (msg.len > 0) {
+      } else if (msg.size > 0) {
         if (Jt808FrameParse(msg, propara) &&
             (propara.respond_id == DOWN_TERMINALCONTROL)) {
             retval = 0;
@@ -2213,7 +2211,7 @@ int Jt808Service::DealVehicleControlRequest(DeviceNode &device,
   uint32_t u32val;
   std::string arg;
   ProtocolParameters propara = {0};
-  MessageData msg = {0};
+  Message msg = {0};
 
   arg = va_vec.back();
   va_vec.pop_back();
@@ -2231,7 +2229,7 @@ int Jt808Service::DealVehicleControlRequest(DeviceNode &device,
         close(device.socket_fd);
         device.socket_fd = -1;
         break;
-      } else if (msg.len > 0) {
+      } else if (msg.size > 0) {
         if (Jt808FrameParse(msg, propara) == UP_VEHICLECONTROLRESPONSE) {
             retval = 0;
             break;
@@ -2415,7 +2413,7 @@ int Jt808Service::ParseCommand(char *buffer) {
 }
 
 void Jt808Service::UpgradeHandler(void) {
-  MessageData msg;
+  Message msg;
   ProtocolParameters propara;
   std::ifstream ifs;
   char *data = nullptr;
@@ -2457,7 +2455,7 @@ void Jt808Service::UpgradeHandler(void) {
             memcpy(propara.packet_data,
                    data + max_data_len * (propara.packet_sequence_num - 1),
                    propara.packet_data_len);
-            msg.len = Jt808FramePack(msg, DOWN_UPDATEPACKAGE, propara);
+            msg.size = Jt808FramePack(msg, DOWN_UPDATEPACKAGE, propara);
             if (SendFrameData(device.socket_fd, msg)) {
               close(device.socket_fd);
               device.socket_fd = -1;
@@ -2468,7 +2466,7 @@ void Jt808Service::UpgradeHandler(void) {
                   close(device.socket_fd);
                   device.socket_fd = -1;
                   break;
-                } else if (msg.len > 0) {
+                } else if (msg.size > 0) {
                   if ((Jt808FrameParse(msg, propara) == UP_UNIRESPONSE) &&
                       (propara.respond_id == DOWN_UPDATEPACKAGE)) {
                     break;

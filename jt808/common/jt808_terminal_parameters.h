@@ -1,5 +1,5 @@
-#ifndef JT808_SERVICE_JT808_TERMINAL_PARAMETERS_H_
-#define JT808_SERVICE_JT808_TERMINAL_PARAMETERS_H_
+#ifndef JT808_COMMON_JT808_TERMINAL_PARAMETERS_H_
+#define JT808_COMMON_JT808_TERMINAL_PARAMETERS_H_
 
 #include <stdint.h>
 
@@ -245,4 +245,4 @@ void PrepareParemeterIdList(std::vector<std::string> &va_vec,
                             std::vector<uint32_t> &id_vec);
 
 
-#endif // JT808_SERVICE_JT808_TERMINAL_PARAMETERS_H_
+#endif // JT808_COMMON_JT808_TERMINAL_PARAMETERS_H_
