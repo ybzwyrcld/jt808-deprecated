@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.1)
+cmake_minimum_required(VERSION 3.5)
 
 project(jt808service)
 
@@ -20,7 +20,7 @@ configure_file(
   COPYONLY
 )
 
-#add_subdirectory(googletest)
+add_subdirectory(googletest)
 add_subdirectory(bcd)
 add_subdirectory(unix_socket)
 

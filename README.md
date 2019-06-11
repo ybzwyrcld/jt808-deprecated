@@ -30,11 +30,12 @@ $ ./jt808command 13826539850 getterminalparameter 0020
 terminal parameter(id:value): 0020:0
 ```
 
+
 ## CMake
 
 ### 编译准备
 ```bash
-$ sudo apt install cmake cmake-curses-gui
+$ sudo apt-get install cmake cmake-curses-gui
 ```
 
 ### 下载源码
@@ -42,6 +43,12 @@ $ sudo apt install cmake cmake-curses-gui
 $ git clone https://github.com/hanoi404/jt808 && cd jt808/jt808
 $ mkdir build
 ```
+
+### 下载googletest
+```bash
+$ git clone https://github.com/google/googletest
+```
+但还是推荐下载release版本源码包, 然后解压到源码根目录下, 我用的是1.8.1版本.
 
 ### 编译
 ```bash

@@ -22,12 +22,11 @@ target_link_libraries(jt808_terminal PRIVATE
   terminal_terminal_parameter
 )
 
-#add_executable(jt808_test
-#  jt808_test.cc
-#)
+add_executable(jt808_terminal_test
+  jt808_terminal_test.cc
+)
 
-#target_link_libraries(jt808_test PRIVATE
-#  jt808
-#  gtest
-#  gtest_main
-#)
+target_link_libraries(jt808_terminal_test PRIVATE
+  jt808_terminal
+  gmock_main
+)
