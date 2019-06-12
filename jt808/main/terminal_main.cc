@@ -40,9 +40,11 @@ int main(int argc, char *argv[]) {
     exit(0);
   }
 
+  my_terminal.Init();
+
   while (1) {
     gettimeofday(&time_begin, NULL);
-    if (--report_interval == 0) {
+    if ((report_interval >= 0) && (--report_interval == 0)) {
       report_interval = my_terminal.report_interval();
       if (my_terminal.ReportPosition() < 0) {
         break;
@@ -51,6 +53,9 @@ int main(int argc, char *argv[]) {
     do {
       if ((retval = my_terminal.RecvFrameData()) > 0) {
         my_terminal.Jt808FrameParse();
+      }
+      if ((report_interval < 0) && (my_terminal.report_interval() > 0)) {
+        report_interval = my_terminal.report_interval();
       }
       gettimeofday(&time_end, NULL);
     } while (CalculatingTimeMs(time_begin, time_end) < 1000);

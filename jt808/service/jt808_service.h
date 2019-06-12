@@ -88,6 +88,7 @@ class Jt808Service {
                                 std::vector<std::string> &va_vec);
 
   int ParseCommand(char *command);
+  bool CheckPacketComplete(int &sock, ProtocolParameters &propara);
 
   // Deal upgrade request thread.
   void UpgradeHandler(void);

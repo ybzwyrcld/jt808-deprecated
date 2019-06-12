@@ -38,6 +38,9 @@ Jt808Terminal::~Jt808Terminal() {
 void Jt808Terminal::Init() {
   message_flow_number_ = 0;
   parameter_set_type_ = 0;
+  pro_para_.terminal_parameter_list = nullptr;
+  pro_para_.packet_map = nullptr;
+  pro_para_.packet_id_list = nullptr;
   ReadTerminalParameterFormFile(kTerminalParametersFlie,
                                 terminal_parameter_list_);
   alarm_bit_.value = 0;
@@ -431,6 +434,20 @@ int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
       message_.size += pass_through_.size;
       msghead_ptr->attribute.bit.msglen += pass_through_.size;
       break;
+    case DOWN_PACKETRESEND:
+      u16val = EndianSwap16(pro_para_.packet_first_flow_num);
+      memcpy(msg_body, &u16val, 2);
+      msg_body += 2;
+      *msg_body = pro_para_.packet_id_list->size();
+      msg_body++;
+      for (auto &packet_id : *pro_para_.packet_id_list) {
+        u16val = EndianSwap16(packet_id);
+        memcpy(msg_body, &u16val, 2);
+        msg_body += 2;
+      }
+      message_.size += 3 + pro_para_.packet_id_list->size();
+      msghead_ptr->attribute.bit.msglen += 3 + pro_para_.packet_id_list->size();
+      break;
     default:
       break;
   }
@@ -548,6 +565,14 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
           break;
         case UP_PASSTHROUGH:
           printf("%s[%d]: received up passthrough respond: ",
+                  __FUNCTION__, __LINE__);
+          break;
+        case DOWN_PACKETRESEND:
+          printf("%s[%d]: received packet resend respond: ",
+                  __FUNCTION__, __LINE__);
+          break;
+        default:
+          printf("%s[%d]: received undefined respond: ",
                   __FUNCTION__, __LINE__);
           break;
       }
@@ -702,17 +727,24 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
       break;
     case DOWN_UPDATEPACKAGE:
       uint8_t *packet_ptr;
+      uint16_t packet_seq;
+      uint16_t packet_total;
       uint32_t packet_len;
-      uint32_t packet_seq;
-      uint32_t packet_total;
       printf("%s[%d]: received update package\r\n", __FUNCTION__, __LINE__);
       if (msgbody_attribute.bit.package) {
         memcpy(&u16val, &message_.buffer[13], 2);
-        packet_total = EndianSwap16(u16val);
+        pro_para_.packet_total_num = EndianSwap16(u16val);
         memcpy(&u16val, &message_.buffer[15], 2);
         packet_seq = EndianSwap16(u16val);
+        if (pro_para_.packet_map == nullptr) {
+          pro_para_.packet_map = new std::map<uint16_t, Message>;
+        }
+        if (pro_para_.packet_id_list == nullptr) {
+          pro_para_.packet_id_list = new std::list<uint16_t>;
+          pro_para_.packet_first_flow_num = pro_para_.respond_flow_num;
+        }
       } else {
-        packet_total = packet_seq = 0;
+        pro_para_.packet_total_num = packet_seq = 0;
       }
       if (message_.buffer[message_.size-2] !=
           BccCheckSum(&message_.buffer[1], message_.size-3)) {
@@ -720,17 +752,61 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
         printf("%s[%d]: check sum error, %02X, %02X\n", __FUNCTION__, __LINE__,
                message_.buffer[message_.size-2],
                BccCheckSum(&message_.buffer[1], message_.size-3));
+        pro_para_.packet_id_list->push_back(packet_seq);
         memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
         Jt808FramePack(UP_UNIRESPONSE);
         SendFrameData();
         break;
+      } else {
+        if (pro_para_.packet_total_num) {
+          pro_para_.packet_map->insert(std::make_pair(packet_seq, message_));
+        } else {
+          pro_para_.packet_map->insert(std::make_pair(1, message_));
+        }
+        pro_para_.respond_result = kSuccess;
+        memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
+        Jt808FramePack(UP_UNIRESPONSE);
+        SendFrameData();
       }
-
-      // length of current packet's valid data.
-      memcpy(&u32val, &msg_body[7+msg_body[6]], 4);
-      packet_len = EndianSwap32(u32val);
-      packet_ptr = &msg_body[11+msg_body[6]];
-      if ((msgbody_attribute.bit.package == 0) || (packet_seq == 1)) {
+      if (!pro_para_.packet_id_list->empty()) {
+        packet_total = pro_para_.packet_id_list->back();
+        for (auto packet_id_it = pro_para_.packet_id_list->begin();
+             packet_id_it != pro_para_.packet_id_list->end(); ) {
+          if (*packet_id_it == packet_seq) {
+            pro_para_.packet_id_list->erase(packet_id_it);
+            break;
+          } else {
+            ++packet_id_it;
+          }
+        }
+      } else {
+        packet_total = pro_para_.packet_total_num;
+      }
+      if ((packet_total == packet_seq) &&
+          (pro_para_.packet_map->size() != pro_para_.packet_total_num)) {
+        if (pro_para_.packet_id_list->empty()) {
+          packet_seq = 1;
+          auto packet_msg_it = pro_para_.packet_map->begin();
+          for ( ; packet_seq <= pro_para_.packet_total_num; ++packet_seq) {
+            if ((packet_msg_it != pro_para_.packet_map->end()) &&
+                (packet_seq == packet_msg_it->first)) {
+              packet_msg_it++;
+              continue;
+            }
+            pro_para_.packet_id_list->push_back(packet_seq);
+          }
+        }
+        memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
+        Jt808FramePack(DOWN_PACKETRESEND);
+        SendFrameData();
+      } else if ((pro_para_.packet_total_num == 0) ||
+                 (pro_para_.packet_map->size() == pro_para_.packet_total_num)) {
+        message_ = pro_para_.packet_map->begin()->second;
+        if (pro_para_.packet_total_num) {
+          msg_body = &message_.buffer[MSGBODY_PACKAGE_POS];
+        } else {
+          msg_body = &message_.buffer[MSGBODY_NOPACKAGE_POS];
+        }
         memset(&upgrade_info_, 0x0, sizeof(upgrade_info_));
         memcpy(upgrade_info_.version_id, &msg_body[7], msg_body[6]);
         uint8_t upgrade_type_id = msg_body[0];
@@ -761,26 +837,36 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
         }
         // in case it already exists.
         unlink(upgrade_info_.file_path);
-      }
-
-      // write to lcoal file.
-      ofs.open(upgrade_info_.file_path,
-               std::ios::binary | std::ios::out | std::ios::app);
-      if (ofs.is_open()) {
-        ofs.write(reinterpret_cast<char *>(packet_ptr), packet_len);
-        ofs.close();
-        pro_para_.respond_result = kSuccess;
-      } else {
-        pro_para_.respond_result = kFailure;
-      }
-
-      // report receive result.
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
-
-      // if received all packet, generate upgrade flag.
-      if (packet_total == packet_seq) {
+        // write to lcoal file.
+        ofs.open(upgrade_info_.file_path,
+                 std::ios::binary | std::ios::out | std::ios::app);
+        if (ofs.is_open()) {
+          if (pro_para_.packet_total_num == 0) {
+            memcpy(&u32val, &msg_body[7+msg_body[6]], 4);
+            packet_len = EndianSwap32(u32val);
+            packet_ptr = &msg_body[11+msg_body[6]];
+            ofs.write(reinterpret_cast<char *>(packet_ptr), packet_len);
+          } else {
+            for (auto &element : *pro_para_.packet_map) {
+               msg_body = &element.second.buffer[MSGBODY_PACKAGE_POS];
+               memcpy(&u32val, &msg_body[7+msg_body[6]], 4);
+               packet_len = EndianSwap32(u32val);
+               packet_ptr = &msg_body[11+msg_body[6]];
+               ofs.write(reinterpret_cast<char *>(packet_ptr), packet_len);
+            }
+            pro_para_.packet_map->erase(pro_para_.packet_map->begin(),
+                                        pro_para_.packet_map->end());
+            if (!pro_para_.packet_id_list->empty()) {
+              pro_para_.packet_id_list->clear();
+            }
+            delete pro_para_.packet_map;
+            delete pro_para_.packet_id_list;
+            pro_para_.packet_map = nullptr;
+            pro_para_.packet_id_list = nullptr;
+          }
+          ofs.close();
+          pro_para_.packet_total_num = 0;
+        }
         std::string str = "echo 0 > \"/tmp/JT808UPG&&";
         if (upgrade_info_.upgrade_type == kGpsUpgrade) {
           str += "GPS&&";

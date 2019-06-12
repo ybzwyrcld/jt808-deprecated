@@ -778,6 +778,9 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
         case DOWN_UPDATEPACKAGE:
           printf("%s[%d]: received updatepackage respond: ",
                  __FILE__, __LINE__);
+          if (propara.packet_total_num && (msg_body[4] == kSuccess)) {
+            propara.packet_response_success_num++;
+          }
           break;
         case DOWN_SETTERMPARA:
           printf("%s[%d]: received set terminal parameter respond: ",
@@ -1006,6 +1009,18 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
         ClearContainerElement(propara.can_bus_data_list);
         delete propara.can_bus_data_list;
       }
+      break;
+    case DOWN_PACKETRESEND:
+      msg_body += 2;
+      u8val = *msg_body;
+      msg_body++;
+      for (int i = 0; i < u8val; ++i) {
+        memcpy(&u16val, &msg_body[0], 2);
+        u16val = EndianSwap16(u16val);
+        propara.packet_id_list->push_back(u16val);
+        msg_body += 2;
+      }
+      propara.respond_result = kSuccess;
       break;
     default:
       break;
@@ -2412,6 +2427,62 @@ int Jt808Service::ParseCommand(char *buffer) {
   return retval;
 }
 
+bool Jt808Service::CheckPacketComplete(int &sock, ProtocolParameters &propara) {
+  Message msg = {0};
+  if (propara.packet_total_num &&
+      (propara.packet_total_num ==
+       propara.packet_response_success_num)) {
+    return true;
+  } else {
+    while (1) {
+      if (RecvFrameData(sock, msg)) {
+        close(sock);
+        sock = -1;
+        break;
+      } else if (msg.size > 0) {
+        if (Jt808FrameParse(msg, propara) == DOWN_PACKETRESEND) {
+          memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
+          msg.size = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
+          if (SendFrameData(sock, msg)) {
+            close(sock);
+            sock = -1;
+          }
+          break;
+        }
+      }
+      if (sock == -1) break;
+      auto packet_id_it = propara.packet_id_list->begin();
+      for (auto packet : *propara.packet_map) {
+        if (packet_id_it == propara.packet_id_list->end()) break;
+        if (packet.first == *packet_id_it) {
+          if (SendFrameData(sock, packet.second)) {
+            close(sock);
+            sock = -1;
+            break;
+          } else {
+            while (1) {
+              if (RecvFrameData(sock, msg)) {
+                close(sock);
+                sock = -1;
+                break;
+              } else if (msg.size > 0) {
+                if ((Jt808FrameParse(msg, propara) == UP_UNIRESPONSE) &&
+                    (propara.respond_id == DOWN_UPDATEPACKAGE)) {
+                  break;
+                }
+              }
+            }
+            if (sock == -1) break;
+          }
+          packet_id_it = propara.packet_id_list->erase(packet_id_it);
+        }
+      }
+      if (sock == -1) break;
+    }
+  }
+  return false;
+}
+
 void Jt808Service::UpgradeHandler(void) {
   Message msg;
   ProtocolParameters propara;
@@ -2442,6 +2513,8 @@ void Jt808Service::UpgradeHandler(void) {
           propara.packet_sequence_num = 1;
           propara.upgrade_type = device.upgrade_type;
           propara.version_num_len = strlen(device.upgrade_version);
+          propara.packet_map = new std::map<uint16_t, Message>;
+          propara.packet_id_list = new std::list<uint16_t>;
           while (len > 0) {
             memset(msg.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
             if (len > max_data_len) {
@@ -2456,6 +2529,8 @@ void Jt808Service::UpgradeHandler(void) {
                    data + max_data_len * (propara.packet_sequence_num - 1),
                    propara.packet_data_len);
             msg.size = Jt808FramePack(msg, DOWN_UPDATEPACKAGE, propara);
+            propara.packet_map->insert(
+                std::make_pair(propara.packet_sequence_num, msg));
             if (SendFrameData(device.socket_fd, msg)) {
               close(device.socket_fd);
               device.socket_fd = -1;
@@ -2480,10 +2555,16 @@ void Jt808Service::UpgradeHandler(void) {
               usleep(1000);
             }
           }
-
+          while (!CheckPacketComplete(device.socket_fd, propara)) {
+            if (device.socket_fd < 0) break;
+          }
           if (device.socket_fd > 0) {
             EpollRegister(epoll_fd_, device.socket_fd);
           }
+          propara.packet_id_list->clear();
+          propara.packet_map->clear();
+          delete propara.packet_id_list;
+          delete propara.packet_map;
           delete [] data;
           data = nullptr;
         }

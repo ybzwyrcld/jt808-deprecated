@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <list>
+#include <map>
 
 #include "common/jt808_protocol.h"
 #include "common/jt808_vehicle_control.h"
@@ -24,6 +25,8 @@ struct ProtocolParameters {
   uint8_t area_route_id_count;
   uint16_t respond_flow_num;
   uint16_t respond_id;
+  uint16_t packet_first_flow_num;
+  uint16_t packet_response_success_num;
   uint16_t packet_total_num;
   uint16_t packet_sequence_num;
   uint32_t packet_data_len;
@@ -44,6 +47,8 @@ struct ProtocolParameters {
   std::vector<Route *> *route_list;
   std::vector<CanBusData *> *can_bus_data_list;
   std::list<TerminalParameter *> *terminal_parameter_list;
+  std::list<uint16_t> *packet_id_list;
+  std::map<uint16_t, Message> *packet_map;
   uint8_t *terminal_parameter_id_buffer;
   uint8_t *area_route_id_buffer;
 };

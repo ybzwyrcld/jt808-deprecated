@@ -24,6 +24,7 @@
 #define UP_PASSTHROUGH                  0x0900  // 数据上行透传
 
 #define DOWN_UNIRESPONSE        0x8001  // 平台通用应答
+#define DOWN_PACKETRESEND       0x8003  // 补传分包请求
 #define DOWN_REGISTERRESPONSE   0x8100  // 终端注册应答
 #define DOWN_SETTERMPARA        0x8103  // 设置终端参数
 #define DOWN_GETTERMPARA        0x8104  // 查询终端参数
