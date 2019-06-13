@@ -216,6 +216,9 @@
 // BYTE    汇报间隔
 #define JT808SERVICEREPORTINTERVAL       0xF053
 
+
+#define MAX_TERMINAL_PARAMETER_LEN_A_RECORD     (1023 - 3)
+
 // 参数数据类型
 enum ParametersType {
   kUnknowType = 0x0,
@@ -233,16 +236,8 @@ struct TerminalParameter {
   uint8_t parameter_value[256];
 };
 
-bool GetNodeFromTerminalParameterListById(
-         const std::list<TerminalParameter> &list,
-         const uint16_t &id,
-         TerminalParameter &node);
 uint8_t GetParameterTypeByParameterId(const uint32_t &para_id);
 uint8_t GetParameterLengthByParameterType(const uint8_t &para_type);
-void AddParameterNodeIntoList(std::list<TerminalParameter *> *para_list,
-                              const uint32_t &para_id, const char *para_value);
-void PrepareParemeterIdList(std::vector<std::string> &va_vec,
-                            std::vector<uint32_t> &id_vec);
 
 
 #endif // JT808_COMMON_JT808_TERMINAL_PARAMETERS_H_

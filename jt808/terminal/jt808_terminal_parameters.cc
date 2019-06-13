@@ -15,14 +15,12 @@
 #include <string>
 
 #include "bcd/bcd.h"
+#include "common/jt808_util.h"
 
 
-void ReadTerminalParameterFormFile(const char *path,
-                                   std::list<TerminalParameter> &list) {
-  char *result;
-  char line[512] = {0};
-  char flags = ';';
-  uint32_t u32val;
+int ReadTerminalParameterFormFile(const char *path,
+                                  std::map<uint32_t, std::string> &map) {
+  int retval = -1;
 
   system("sync");
   system("sync");
@@ -30,73 +28,62 @@ void ReadTerminalParameterFormFile(const char *path,
   ifs.open(path, std::ios::in | std::ios::binary);
   if (ifs.is_open()) {
     std::string str;
-    uint8_t type;
+    uint32_t u32val;
+    char value[256] = {0};
     while (getline(ifs, str)) {
-      // one line: 'id;len(in bytes);value'.
-      TerminalParameter node;
-      memset(line, 0x0, sizeof(line));
-      memset(&node, 0x0, sizeof(node));
-      str.copy(line, str.length(), 0);
-      result = strtok(line, &flags);
-      sscanf(result, "%x", &u32val);
-      node.parameter_id = u32val;
-      type = GetParameterTypeByParameterId(node.parameter_id);
-      result = strtok(NULL, &flags);
-      sscanf(result, "%u", &u32val);
-      node.parameter_len = static_cast<uint8_t>(u32val);
-      result = strtok(NULL, &flags);
-      if (type == kStringType) {
-        str = result;
-        memcpy(node.parameter_value, str.c_str(), str.length());
-      } else {
-        sscanf(result, "%u", &u32val);
-        memcpy(node.parameter_value, &u32val, node.parameter_len);
-      }
-      list.push_back(node);
+      if (str.empty()) break;
+      memset(value, 0x0, 256);
+      sscanf(str.c_str(), "%x:%[^;]", &u32val, value);
+      map.insert(std::make_pair(u32val, value));
     }
     ifs.close();
+    if (!map.empty()) retval = 0;
   }
+  return retval;
 }
 
-void WriteTerminalParameterToFile(const char *path,
-                                  const std::list<TerminalParameter> &list) {
-  char line[512] = {0};
 
-  if (list.empty()) {
-    return ;
-  }
+int WriteTerminalParameterToFile(const char *path,
+                                 std::map<uint32_t, std::string> &map) {
+  int retval = -1;
+
+  if (map.empty())  return retval;
 
   std::ofstream ofs;
   ofs.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
   if (ofs.is_open()) {
-    uint8_t type;
-    uint32_t u32val;
-    auto it = list.begin();
-    while (it != list.end()) {
-      memset(line, 0x0, sizeof(line));
-      type = GetParameterTypeByParameterId(it->parameter_id);
-      if (type == kStringType) {
-        snprintf(line, sizeof(line),
-                "%04X;%u;%s;\n",
-                it->parameter_id,
-                it->parameter_len,
-                it->parameter_value);
-      } else {
-        u32val = 0;
-        memcpy(&u32val, it->parameter_value, it->parameter_len);
-        snprintf(line, sizeof(line),
-                "%04X;%u;%u;\n",
-                it->parameter_id,
-                it->parameter_len,
-                it->parameter_len == 4 ? u32val:u32val);
-      }
-      //printf("line: %s\n", line);
-      ofs.write(line, strlen(line));
-      ++it;
+    char line[512] = {0};
+    int len = 0;
+    for (auto parameter : map) {
+      memset(line, 0x0, 512);
+      len = snprintf(line, 512, "%04X:%s;\n",
+                     parameter.first, parameter.second.c_str());
+      ofs.write(line, len);
     }
     ofs.close();
     system("sync");
     system("sync");
+    retval = 0;
   }
+  return retval;
 }
 
+int PrepareTerminalParameterIdList(const uint8_t *buf, const size_t &size,
+                                   const std::map<uint32_t, std::string> &map,
+                                   std::vector<uint32_t> *id_list) {
+  uint32_t parameter_id = 0;
+
+  for (size_t i = 0; i < size; ++i) {
+    memcpy(&parameter_id, buf + i * 4, 4);
+    parameter_id = EndianSwap32(parameter_id);
+    try {
+      map.at(parameter_id);
+      id_list->push_back(parameter_id);
+    } catch(const std::out_of_range& e) {
+      fprintf(stderr, "No such terminal parameter id!!!\n");
+      return -1;
+    }
+  }
+
+  return 0;
+}

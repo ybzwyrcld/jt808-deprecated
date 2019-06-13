@@ -46,9 +46,9 @@ struct ProtocolParameters {
   std::vector<PolygonalArea *> *polygonal_area_list;
   std::vector<Route *> *route_list;
   std::vector<CanBusData *> *can_bus_data_list;
-  std::list<TerminalParameter *> *terminal_parameter_list;
   std::list<uint16_t> *packet_id_list;
   std::map<uint16_t, Message> *packet_map;
+  std::map<uint32_t, std::string> *terminal_parameter_map;
   uint8_t *terminal_parameter_id_buffer;
   uint8_t *area_route_id_buffer;
 };

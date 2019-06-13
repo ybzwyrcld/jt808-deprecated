@@ -6,6 +6,8 @@
 #include <string.h>
 
 #include <list>
+#include <map>
+#include <string>
 #include <vector>
 
 #include "common/jt808_upgrade.h"
@@ -29,7 +31,7 @@ class Jt808Terminal {
   Jt808Terminal& operator=(const Jt808Terminal&) = delete;
   virtual ~Jt808Terminal();
 
-  void Init(void);
+  int Init(void);
   int RequestConnectServer(void);
   int RequestLoginServer(void);
   int ConnectRemote(void);
@@ -38,18 +40,10 @@ class Jt808Terminal {
   int SendFrameData(void);
   int RecvFrameData(void);
 
-  // Prepare the required terminal parameter list
-  // according to the command content sent by the platform.
-  void PrepareTerminalParaList(std::list<TerminalParameter *> &para_list,
-                               const unsigned char *src);
-
   int Jt808FramePack(const uint16_t &commond);
   uint16_t Jt808FrameParse(void);
   int ReportPosition(void);
   void ReportUpgradeResult(void);
-  void ReadSpecialTerminalParameter(void);
-  void CheckInsideSpecialTerminalParameterSetStatus(void);
-  void CheckOutsideSpecialTerminalParameterSetStatus(void);
 
   // Alarm bit accessors/mutators.
   AlarmBit alarm_bit(void) const { return alarm_bit_; }
@@ -118,6 +112,12 @@ class Jt808Terminal {
     }
   }
 
+  int heartbeat_interval(void) const {
+    return atoi(terminal_parameter_map_.at(1).c_str());
+  }
+
+  int HeartBeat(void);
+
   int terminal_control_type(void) const { return terminal_control_type_; }
 
   // return current upgrade info.
@@ -131,8 +131,9 @@ class Jt808Terminal {
 
  private:
   const char *kDownloadDir = "/upgrade";
-  const char *kTerminalParametersFlie = "/etc/GNSSReceiver/jt808/termpara.txt";
-  const char *kAreaRouteFlie = "/etc/GNSSReceiver/jt808/arearoute.txt";
+  const char *kTerminalParametersFlie =
+     "/etc/jt808/terminal/terminalparameter.txt";
+  const char *kAreaRouteFlie = "/etc/jt808/terminal/jt808/arearoute.txt";
 
   bool is_connect_ = false;
   int socket_fd_ = -1;
@@ -156,7 +157,7 @@ class Jt808Terminal {
   CanBusDataTimestamp can_bus_data_timestamp_;
   AreaRouteSet area_route_set_ = {0};
   std::vector<CanBusData> *can_bus_data_list_ = nullptr;
-  std::list<TerminalParameter> terminal_parameter_list_;
+  std::map<uint32_t, std::string> terminal_parameter_map_;
 };
 
 #endif // JT808_TERMINAL_JT808_TERMINAL_H_

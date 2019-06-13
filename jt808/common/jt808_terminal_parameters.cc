@@ -1,28 +1,5 @@
 #include "common/jt808_terminal_parameters.h"
 
-#include <string.h>
-#include <algorithm>
-
-
-bool GetNodeFromTerminalParameterListById(
-         const std::list<TerminalParameter> &list,
-         const uint16_t &id,
-         TerminalParameter &node) {
-  if (list.empty()) {
-    return false;
-  }
-
-  auto it = list.begin();
-  while (it != list.end()) {
-    if (it->parameter_id == id) {
-      node = *it;
-      break;
-    }
-    ++it;
-  }
-
-  return (it == list.end() ? false : true);
-}
 
 uint8_t GetParameterTypeByParameterId(const uint32_t &para_id) {
   switch (para_id) {
@@ -71,42 +48,5 @@ uint8_t GetParameterLengthByParameterType(const uint8_t &para_type) {
     default:
       return 0;
   }
-}
-
-void AddParameterNodeIntoList(std::list<TerminalParameter *> *para_list,
-                              const uint32_t &para_id,
-                              const char *para_value) {
-  if (para_list == nullptr) {
-      return ;
-    }
-
-  TerminalParameter *node = new TerminalParameter;
-  memset(node, 0x0, sizeof(*node));
-  node->parameter_id = para_id;
-  node->parameter_type = GetParameterTypeByParameterId(para_id);
-  node->parameter_len = GetParameterLengthByParameterType(
-      node->parameter_type);
-  if (para_value != nullptr) {
-    if (node->parameter_type == kStringType) {
-      node->parameter_len = strlen(para_value);
-    }
-    memcpy(node->parameter_value, para_value, node->parameter_len);
-  }
-  para_list->push_back(node);
-}
-
-void PrepareParemeterIdList(std::vector<std::string> &va_vec,
-                            std::vector<uint32_t> &id_vec) {
-  char parameter_id[9] = {0};
-  std::string arg;
-  reverse(id_vec.begin(), id_vec.end());
-  while (!id_vec.empty()) {
-    snprintf(parameter_id, 5, "%04X", id_vec.back());
-    arg = parameter_id;
-    va_vec.push_back(arg);
-    memset(parameter_id, 0x0, sizeof(parameter_id));
-    id_vec.pop_back();
-  }
-  reverse(va_vec.begin(), va_vec.end());
 }
 

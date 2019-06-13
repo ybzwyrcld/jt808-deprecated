@@ -46,27 +46,8 @@ class Jt808Service {
 
   uint16_t Jt808FrameParse(Message &msg, ProtocolParameters &propara);
 
-  int DealGetStartupRequest(DeviceNode &device, char *result);
-  int DealSetStartupRequest(DeviceNode &device,
-                            std::vector<std::string> &va_vec);
-  int DealGetGpsRequest(DeviceNode &device, char *result);
-  int DealSetGpsRequest(DeviceNode &device,
-                        std::vector<std::string> &va_vec);
-  int DealGetCdradioRequest(DeviceNode &device, char *result);
-  int DealSetCdradioRequest(DeviceNode &device,
-                            std::vector<std::string> &va_vec);
-  int DealGetNtripCorsRequest(DeviceNode &device, char *result);
-  int DealSetNtripCorsRequest(DeviceNode &device,
-                              std::vector<std::string> &va_vec);
-  int DealGetNtripServiceRequest(DeviceNode &device, char *result);
-  int DealSetNtripServiceRequest(DeviceNode &device,
-                                 std::vector<std::string> &va_vec);
-  int DealGetJt808ServiceRequest(DeviceNode &device, char *result);
-  int DealSetJt808ServiceRequest(DeviceNode &device,
-                                 std::vector<std::string> &va_vec);
   int DealGetTerminalParameterRequest(DeviceNode &device,
                                       std::vector<std::string> &va_vec);
-
   int DealSetTerminalParameterRequest(DeviceNode &device,
                                       std::vector<std::string> &va_vec);
   int DealSetCircularAreaRequest(DeviceNode &device,
@@ -99,7 +80,7 @@ class Jt808Service {
   }
 
  private:
-  const char *kDevicesFilePath = "./devicelist/devices.txt";
+  const char *kDevicesFilePath = "/etc/jt808/service/devices.txt";
   const char *kCommandInterfacePath = "/tmp/jt808cmd.sock";
 
   int listen_sock_ = -1;

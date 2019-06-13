@@ -14,12 +14,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wfatal-errors")
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_BINARY_DIR}")
 
-configure_file(
-  ${PROJECT_SOURCE_DIR}/devicelist/devices.txt
-  ${PROJECT_BINARY_DIR}/devicelist/devices.txt
-  COPYONLY
-)
-
 add_subdirectory(googletest)
 add_subdirectory(bcd)
 add_subdirectory(unix_socket)

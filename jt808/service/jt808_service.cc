@@ -230,7 +230,9 @@ void Jt808Service::Run(const int &time_out) {
               if (RecvFrameData(epoll_events_[i].data.fd, msg) == 0) {
                 int cmd = Jt808FrameParse(msg, propara);
                 switch (cmd) {
-                  case UP_UPDATERESULT: case UP_POSITIONREPORT:
+                  case UP_HEARTBEAT:
+                  case UP_UPDATERESULT:
+                  case UP_POSITIONREPORT:
                     memset(msg.buffer, 0x0, sizeof(msg.buffer));
                     msg.size = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
                     if (SendFrameData(epoll_events_[i].data.fd, msg)) {
@@ -305,6 +307,7 @@ int Jt808Service::Jt808FramePack(Message &msg,
                                  const uint16_t &command,
                                  const ProtocolParameters &propara) {
   uint8_t *msg_body;
+  uint8_t u8val;
   uint16_t u16val;
   uint32_t u32val;
   MessageHead *msghead_ptr;
@@ -361,49 +364,47 @@ int Jt808Service::Jt808FramePack(Message &msg,
         msg_body += 4;
         msg.size += 4;
       }
-      if ((propara.terminal_parameter_list != nullptr) &&
-          !propara.terminal_parameter_list->empty()) {
-        msg_body[0] = propara.terminal_parameter_list->size();
-        msg_body++;
-        msg.size++;
-        msghead_ptr->attribute.bit.msglen += 1;
-        for (auto &terminal_parameter : *propara.terminal_parameter_list) {
-          u32val = EndianSwap32(terminal_parameter->parameter_id);
-          memcpy(msg_body, &u32val, 4);
-          msg_body += 4;
-          memcpy(msg_body, &(terminal_parameter->parameter_len), 1);
-          msg_body++;
-          u16val = GetParameterTypeByParameterId(
-                       terminal_parameter->parameter_id);
-          switch (u16val) {
-            case kWordType:
-              memcpy(&u16val, terminal_parameter->parameter_value, 2);
-              u16val = EndianSwap16(u16val);
-              memcpy(msg_body, &u16val, 2);
-              break;
-            case kDwordType:
-              memcpy(&u32val, terminal_parameter->parameter_value, 4);
-              u32val = EndianSwap32(u32val);
-              memcpy(msg_body, &u32val, 4);
-              break;
-            case kByteType:
-            case kStringType:
-              memcpy(msg_body, terminal_parameter->parameter_value,
-                     terminal_parameter->parameter_len);
-              break;
-            default:
-              break;
-          }
-          msg_body += terminal_parameter->parameter_len;
-          msg.size += 5 + terminal_parameter->parameter_len;
-          msghead_ptr->attribute.bit.msglen +=
-               5 + terminal_parameter->parameter_len;
+      msg_body[0] = propara.terminal_parameter_map->size();
+      msg_body++;
+      msg.size++;
+      msghead_ptr->attribute.bit.msglen += 1;
+      for (auto &parameter : *propara.terminal_parameter_map) {
+        u32val = EndianSwap32(parameter.first);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        switch (GetParameterTypeByParameterId(parameter.first)) {
+          case kByteType:
+            *msg_body = 1;
+            u32val = atoi(parameter.second.c_str());
+            memcpy(&msg_body[1], &u32val, 1);
+            u8val = 2;
+            break;
+          case kWordType:
+            *msg_body = 2;
+            u32val = atoi(parameter.second.c_str());
+            u16val = EndianSwap16(u16val);
+            memcpy(&msg_body[1], &u16val, 2);
+            u8val = 3;
+            break;
+          case kDwordType:
+            *msg_body = 4;
+            u32val = atoi(parameter.second.c_str());
+            u32val = EndianSwap32(u32val);
+            memcpy(&msg_body[1], &u32val, 4);
+            u8val = 5;
+            break;
+          case kStringType:
+            *msg_body = parameter.second.size();
+            memcpy(&msg_body[1], parameter.second.c_str(),
+                   parameter.second.size());
+            u8val = 1 + parameter.second.size();
+            break;
+          default:
+            break;
         }
-      } else {
-        msg_body[0] = 0;
-        msg_body++;
-        msg.size++;
-        msghead_ptr->attribute.bit.msglen += 1;
+        msg_body += u8val;
+        msg.size += 4 + u8val;
+        msghead_ptr->attribute.bit.msglen += 4 + u8val;
       }
       break;
     case DOWN_GETTERMPARA:
@@ -415,10 +416,10 @@ int Jt808Service::Jt808FramePack(Message &msg,
       msghead_ptr->attribute.bit.msglen += 1;
       // deal terminal parameters id.
       for (int i = 0; i < propara.terminal_parameter_id_count; ++i) {
-          memcpy(msg_body, propara.terminal_parameter_id_buffer + i*4, 4);
-          msg_body += 4;
-          msg.size += 4;
-          msghead_ptr->attribute.bit.msglen += 4;
+        memcpy(msg_body, propara.terminal_parameter_id_buffer + i*4, 4);
+        msg_body += 4;
+        msg.size += 4;
+        msghead_ptr->attribute.bit.msglen += 4;
       }
       break;
     case DOWN_TERMINALCONTROL:
@@ -730,7 +731,7 @@ int Jt808Service::Jt808FramePack(Message &msg,
   msg.buffer[0] = PROTOCOL_SIGN;
   msg.buffer[msg.size++] = PROTOCOL_SIGN;
 
-  printf("%s[%d]: socket-send:\n", __FILE__, __LINE__);
+  printf("%s[%d]: socket-send[%lu]:\n", __FILE__, __LINE__, msg.size);
   for (uint16_t i = 0; i < msg.size; ++i) {
     printf("%02X ", msg.buffer[i]);
   }
@@ -749,7 +750,7 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
   MessageHead *msghead_ptr;
   MessageBodyAttr msgbody_attribute;
 
-  // printf("%s[%d]: socket-recv:\n", __FILE__, __LINE__);
+  // printf("%s[%d]: socket-recv[%lu]:\n", __FILE__, __LINE__, msg.size);
   // for (uint16_t i = 0; i < msg.size; ++i) {
   //   printf("%02X ", msg.buffer[i]);
   // }
@@ -831,7 +832,7 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
         default:
           break;
       }
-      // respond result.
+      // Respond result.
       if (msg_body[4] == kSuccess) {
         printf("normal\r\n");
       } else if (msg_body[4] == kFailure) {
@@ -883,49 +884,47 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
     case UP_GETPARARESPONSE:
       printf("%s[%d]: received get terminal parameter respond\n",
              __FILE__, __LINE__);
+      char parameter_value[256];
+      uint32_t parameter_id;
+      int parameter_count;
       if (msgbody_attribute.bit.package) {
         memcpy(&u16val, &msg.buffer[13], 2);
         propara.packet_total_num = EndianSwap16(u16val);
         memcpy(&u16val, &msg.buffer[15], 2);
         propara.packet_sequence_num = EndianSwap16(u16val);
       }
+      parameter_count = msg_body[2];
       msg_body += 3;
-      if (propara.terminal_parameter_list != nullptr) {
-        int len = msgbody_attribute.bit.msglen - 3;
-        char parameter_value[256] ={0};
-        uint32_t parameter_id = 0;
-        while (len) {
-          memcpy(&u32val, &msg_body[0], 4);
-          parameter_id = EndianSwap32(u32val);
-          msg_body += 4;
-          u8val = msg_body[0];
-          msg_body++;
-          memset(parameter_value, 0x0, sizeof(parameter_value));
-          switch (GetParameterTypeByParameterId(parameter_id)) {
-            case kWordType:
-              memcpy(&u16val, &msg_body[0], u8val);
-              u16val = EndianSwap16(u16val);
-              memcpy(parameter_value, &u16val, u8val);
-              break;
-            case kDwordType:
-              memcpy(&u32val, &msg_body[0], u8val);
-              u32val = EndianSwap32(u32val);
-              memcpy(parameter_value, &u32val, u8val);
-              break;
-            case kByteType:
-            case kStringType:
-              memcpy(parameter_value, &msg_body[0], u8val);
-              break;
-            default:
-              break;
-          }
-          AddParameterNodeIntoList(propara.terminal_parameter_list,
-                                   parameter_id, parameter_value);
-          msg_body += u8val;
-          len -= (u8val + 5);
+      while (parameter_count--) {
+        memcpy(&u32val, &msg_body[0], 4);
+        parameter_id = EndianSwap32(u32val);
+        msg_body += 4;
+        u8val = msg_body[0];
+        msg_body++;
+        memset(parameter_value, 0x0, sizeof(parameter_value));
+        switch (GetParameterTypeByParameterId(parameter_id)) {
+          case kWordType:
+            memcpy(&u16val, &msg_body[0], u8val);
+            u16val = EndianSwap16(u16val);
+            memcpy(parameter_value, &u16val, u8val);
+            break;
+          case kDwordType:
+            memcpy(&u32val, &msg_body[0], u8val);
+            u32val = EndianSwap32(u32val);
+            memcpy(parameter_value, &u32val, u8val);
+            break;
+          case kByteType:
+          case kStringType:
+            memcpy(parameter_value, &msg_body[0], u8val);
+            break;
+          default:
+            break;
         }
-        propara.respond_result = kSuccess;
+        msg_body += u8val;
+        propara.terminal_parameter_map->insert(
+            std::make_pair(parameter_id, parameter_value));
       }
+      propara.respond_result = kSuccess;
       break;
     case UP_UPDATERESULT:
       printf("%s[%d]: received updateresult: ", __FILE__, __LINE__);
@@ -1029,459 +1028,6 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
   return message_id;
 }
 
-int Jt808Service::DealGetStartupRequest(DeviceNode &device, char *result) {
-  int retval = -1;
-  char parameter_value[2] = {0};
-  uint32_t parameter_id;
-  std::string arg;
-  std::vector<std::string> va_vec;
-  std::vector<uint32_t> id_vec;
-
-  id_vec.push_back(STARTUPGPS);
-  id_vec.push_back(STARTUPCDRADIO);
-  id_vec.push_back(STARTUPNTRIPCORS);
-  id_vec.push_back(STARTUPNTRIPSERV);
-  id_vec.push_back(STARTUPJT808SERV);
-  PrepareParemeterIdList(va_vec, id_vec);
-  if ((retval = DealGetTerminalParameterRequest(device, va_vec)) == 0) {
-    std::string str = "startup:";
-    while (!va_vec.empty()) {
-      arg = va_vec.back();
-      va_vec.pop_back();
-      sscanf(arg.c_str(), "%x:%s", &parameter_id, parameter_value);
-      if (parameter_value[0] == '1') {
-        switch (parameter_id) {
-          case STARTUPGPS:
-            str += " gps";
-            break;
-          case STARTUPCDRADIO:
-            str += " cdradio";
-            break;
-          case STARTUPNTRIPCORS:
-            str += " ntripcors";
-            break;
-          case STARTUPNTRIPSERV:
-            str += " ntripservice";
-            break;
-          case STARTUPJT808SERV:
-            str += " jt808service";
-            break;
-        }
-        if (va_vec.empty()) {
-          break;
-        }
-      }
-    }
-    str.copy(result, str.size(), 0);
-  }
-
-  return retval;
-}
-
-int Jt808Service::DealSetStartupRequest(DeviceNode &device,
-                                        std::vector<std::string> &va_vec) {
-  std::vector<std::string> va_vec_old(va_vec.begin(), va_vec.end());
-  va_vec.clear();
-  std::string arg = "F000:";
-  arg += std::to_string(SearchStringInList(va_vec_old, "gps"));
-  va_vec.push_back(arg);
-  arg = "F001:";
-  arg += std::to_string(SearchStringInList(va_vec_old, "cdradio"));
-  va_vec.push_back(arg);
-  arg = "F002:";
-  arg += std::to_string(SearchStringInList(va_vec_old, "ntripcors"));
-  va_vec.push_back(arg);
-  arg = "F003:";
-  arg += std::to_string(SearchStringInList(va_vec_old, "ntripservice"));
-  va_vec.push_back(arg);
-  arg = "F004:";
-  arg += std::to_string(SearchStringInList(va_vec_old, "jt808service"));
-  va_vec.push_back(arg);
-
-  va_vec_old.clear();
-  reverse(va_vec.begin(), va_vec.end());
-  return DealSetTerminalParameterRequest(device, va_vec);
-}
-
-int Jt808Service::DealGetGpsRequest(DeviceNode &device, char *result) {
-  int retval = -1;
-  char parameter_value[2] = {0};
-  uint32_t parameter_id;
-  std::vector<std::string> va_vec;
-  std::vector<uint32_t> id_vec;
-
-  id_vec.push_back(GPSLOGGGA);
-  id_vec.push_back(GPSLOGRMC);
-  id_vec.push_back(GPSLOGATT);
-  PrepareParemeterIdList(va_vec, id_vec);
-  if ((retval = DealGetTerminalParameterRequest(device, va_vec)) == 0) {
-    std::string arg;
-    std::string str = "gps:";
-    while (!va_vec.empty()) {
-      arg = va_vec.back();
-      va_vec.pop_back();
-      sscanf(arg.c_str(), "%x:%s", &parameter_id, parameter_value);
-      if (parameter_value[0] == '1') {
-        switch (parameter_id) {
-          case GPSLOGGGA:
-            str += " LOGGGA";
-            break;
-          case GPSLOGRMC:
-            str += " LOGRMC";
-            break;
-          case GPSLOGATT:
-            str += " LOGATT";
-            break;
-          default:
-            continue;
-        }
-      }
-    }
-    str.copy(result, str.size(), 0);
-  }
-
-  return retval;
-}
-
-int Jt808Service::DealSetGpsRequest(DeviceNode &device,
-                                    std::vector<std::string> &va_vec) {
-  std::vector<std::string> va_vec_old(va_vec.begin(), va_vec.end());
-  va_vec.clear();
-  std::string arg = "F010:";
-  arg += std::to_string(SearchStringInList(va_vec_old, "LOGGGA"));
-  va_vec.push_back(arg);
-  arg = "F011:";
-  arg += std::to_string(SearchStringInList(va_vec_old, "LOGRMC"));
-  va_vec.push_back(arg);
-  arg = "F012:";
-  arg += std::to_string(SearchStringInList(va_vec_old, "LOGATT"));
-  va_vec.push_back(arg);
-
-  va_vec_old.clear();
-  reverse(va_vec.begin(), va_vec.end());
-  return DealSetTerminalParameterRequest(device, va_vec);
-}
-
-int Jt808Service::DealGetCdradioRequest(DeviceNode &device, char *result) {
-  int retval = -1;
-  char parameter_value[256] = {0};
-  uint32_t parameter_id;
-  std::vector<std::string> va_vec;
-  std::vector<uint32_t> id_vec;
-
-  id_vec.push_back(CDRADIOBAUDERATE);
-  id_vec.push_back(CDRADIOWORKINGFREQ);
-  id_vec.push_back(CDRADIORECEIVEMODE);
-  id_vec.push_back(CDRADIOFORMCODE);
-  PrepareParemeterIdList(va_vec, id_vec);
-  if ((retval = DealGetTerminalParameterRequest(device, va_vec)) == 0) {
-    std::string arg;
-    std::string str = "cdradio: ";
-    while (!va_vec.empty()) {
-      arg = va_vec.back();
-      va_vec.pop_back();
-      memset(parameter_value, 0x0, sizeof(parameter_value));
-      sscanf(arg.c_str(), "%x:%s", &parameter_id, parameter_value);
-      switch (parameter_id) {
-        case CDRADIOBAUDERATE:
-          str += "bauderate=";
-          str += parameter_value;
-          break;
-        case CDRADIOWORKINGFREQ:
-          str += "workfreqpoint=";
-          str += parameter_value;
-          break;
-        case CDRADIORECEIVEMODE:
-          str += "recvmode=";
-          str += parameter_value;
-          break;
-        case CDRADIOFORMCODE:
-          str += "formcode=";
-          str += parameter_value;
-          break;
-        default:
-          continue;
-      }
-      if (va_vec.empty()) {
-        break;
-      }
-      str += ",";
-    }
-    str.copy(result, str.size(), 0);
-  }
-
-  return retval;
-}
-
-int Jt808Service::DealSetCdradioRequest(DeviceNode &device,
-                                        std::vector<std::string> &va_vec) {
-  char parameter_value[256] = {0};
-  uint32_t parameter_id = CDRADIOBAUDERATE;
-
-  if (va_vec.size() != 4) {
-    return -1;
-  }
-
-  reverse(va_vec.begin(), va_vec.end());
-  auto va_it = va_vec.begin();
-  while (va_it != va_vec.end()) {
-    memset(parameter_value, 0x0, sizeof(parameter_value));
-    snprintf(parameter_value, sizeof(parameter_value), "%04X:%s",
-             parameter_id, va_it->c_str());
-    *va_it = parameter_value;
-    ++parameter_id;
-    ++va_it;
-  }
-
-  reverse(va_vec.begin(), va_vec.end());
-  return DealSetTerminalParameterRequest(device, va_vec);
-}
-
-int Jt808Service::DealGetNtripCorsRequest(DeviceNode &device, char *result) {
-  int retval = -1;
-  char parameter_value[256] = {0};
-  uint32_t parameter_id;
-  std::vector<std::string> va_vec;
-  std::vector<uint32_t> id_vec;
-
-  id_vec.push_back(NTRIPCORSIP);
-  id_vec.push_back(NTRIPCORSPORT);
-  id_vec.push_back(NTRIPCORSUSERNAME);
-  id_vec.push_back(NTRIPCORSPASSWD);
-  id_vec.push_back(NTRIPCORSMOUNTPOINT);
-  id_vec.push_back(NTRIPCORSREPORTINTERVAL);
-  PrepareParemeterIdList(va_vec, id_vec);
-  if ((retval = DealGetTerminalParameterRequest(device, va_vec)) == 0) {
-    std::string arg;
-    std::string str = "ntripcors: ";
-    while (!va_vec.empty()) {
-      arg = va_vec.back();
-      va_vec.pop_back();
-      memset(parameter_value, 0x0, sizeof(parameter_value));
-      sscanf(arg.c_str(), "%x:%s", &parameter_id, parameter_value);
-      switch (parameter_id) {
-        case NTRIPCORSIP:
-          str += "ip=";
-          str += parameter_value;
-          break;
-        case NTRIPCORSPORT:
-          str += "port=";
-          str += parameter_value;
-          break;
-        case NTRIPCORSUSERNAME:
-          str += "username=";
-          str += parameter_value;
-          break;
-        case NTRIPCORSPASSWD:
-          str += "password=";
-          str += parameter_value;
-          break;
-        case NTRIPCORSMOUNTPOINT:
-          str += "mountpoint=";
-          str += parameter_value;
-          break;
-        case NTRIPCORSREPORTINTERVAL:
-          str += "reportinterval=";
-          str += parameter_value;
-          break;
-        default:
-          continue;
-      }
-      if (va_vec.empty()) {
-        break;
-      }
-      str += ",";
-    }
-    str.copy(result, str.size(), 0);
-  }
-
-  return retval;
-}
-
-int Jt808Service::DealSetNtripCorsRequest(DeviceNode &device,
-                                          std::vector<std::string> &va_vec) {
-  char parameter_value[256] = {0};
-  uint32_t parameter_id = NTRIPCORSIP;
-
-  if (va_vec.size() != 6) {
-    return -1;
-  }
-
-  reverse(va_vec.begin(), va_vec.end());
-  auto va_it = va_vec.begin();
-  while (va_it != va_vec.end()) {
-    memset(parameter_value, 0x0, sizeof(parameter_value));
-    snprintf(parameter_value, sizeof(parameter_value), "%04X:%s",
-             parameter_id, va_it->c_str());
-    *va_it = parameter_value;
-    ++parameter_id;
-    ++va_it;
-  }
-
-  reverse(va_vec.begin(), va_vec.end());
-  return DealSetTerminalParameterRequest(device, va_vec);
-}
-
-int Jt808Service::DealGetNtripServiceRequest(DeviceNode &device, char *result) {
-  int retval = -1;
-  char parameter_value[256] = {0};
-  uint32_t parameter_id;
-  std::vector<std::string> va_vec;
-  std::vector<uint32_t> id_vec;
-
-  id_vec.push_back(NTRIPSERVICEIP);
-  id_vec.push_back(NTRIPSERVICEPORT);
-  id_vec.push_back(NTRIPSERVICEUSERNAME);
-  id_vec.push_back(NTRIPSERVICEPASSWD);
-  id_vec.push_back(NTRIPSERVICEMOUNTPOINT);
-  id_vec.push_back(NTRIPSERVICEREPORTINTERVAL);
-  PrepareParemeterIdList(va_vec, id_vec);
-  if ((retval = DealGetTerminalParameterRequest(device, va_vec)) == 0) {
-    std::string arg;
-    std::string str = "ntripservice: ";
-    while (!va_vec.empty()) {
-      arg = va_vec.back();
-      va_vec.pop_back();
-      memset(parameter_value, 0x0, sizeof(parameter_value));
-      sscanf(arg.c_str(), "%x:%s", &parameter_id, parameter_value);
-      switch (parameter_id) {
-        case NTRIPSERVICEIP:
-          str += "ip=";
-          str += parameter_value;
-          break;
-        case NTRIPSERVICEPORT:
-          str += "port=";
-          str += parameter_value;
-          break;
-        case NTRIPSERVICEUSERNAME:
-          str += "username=";
-          str += parameter_value;
-          break;
-        case NTRIPSERVICEPASSWD:
-          str += "password=";
-          str += parameter_value;
-          break;
-        case NTRIPSERVICEMOUNTPOINT:
-          str += "mountpoint=";
-          str += parameter_value;
-          break;
-        case NTRIPSERVICEREPORTINTERVAL:
-          str += "reportinterval=";
-          str += parameter_value;
-          break;
-        default:
-          continue;
-      }
-      if (va_vec.empty()) {
-        break;
-      }
-      str += ",";
-    }
-    str.copy(result, str.size(), 0);
-  }
-
-  return retval;
-}
-
-int Jt808Service::DealSetNtripServiceRequest(DeviceNode &device,
-                                             std::vector<std::string> &va_vec) {
-  char parameter_value[256] = {0};
-  uint32_t parameter_id = NTRIPSERVICEIP;
-
-  if (va_vec.size() != 6) {
-    return -1;
-  }
-
-  reverse(va_vec.begin(), va_vec.end());
-  auto va_it = va_vec.begin();
-  while (va_it != va_vec.end()) {
-    memset(parameter_value, 0x0, sizeof(parameter_value));
-    snprintf(parameter_value, sizeof(parameter_value), "%04X:%s",
-             parameter_id, va_it->c_str());
-    *va_it = parameter_value;
-    ++parameter_id;
-    ++va_it;
-  }
-
-  reverse(va_vec.begin(), va_vec.end());
-  return DealSetTerminalParameterRequest(device, va_vec);
-}
-
-int Jt808Service::DealGetJt808ServiceRequest(DeviceNode &device, char *result) {
-  int retval = -1;
-  char parameter_value[256] = {0};
-  uint32_t parameter_id;
-  std::vector<std::string> va_vec;
-  std::vector<uint32_t> id_vec;
-
-  id_vec.push_back(JT808SERVICEIP);
-  id_vec.push_back(JT808SERVICEPORT);
-  id_vec.push_back(JT808SERVICEPHONENUM);
-  id_vec.push_back(JT808SERVICEREPORTINTERVAL);
-  PrepareParemeterIdList(va_vec, id_vec);
-  if ((retval = DealGetTerminalParameterRequest(device, va_vec)) == 0) {
-    std::string arg;
-    std::string str = "jt808service: ";
-    while (!va_vec.empty()) {
-      arg = va_vec.back();
-      va_vec.pop_back();
-      memset(parameter_value, 0x0, sizeof(parameter_value));
-      sscanf(arg.c_str(), "%x:%s", &parameter_id, parameter_value);
-      switch (parameter_id) {
-        case JT808SERVICEIP:
-          str += "ip=";
-          str += parameter_value;
-          break;
-        case JT808SERVICEPORT:
-          str += "port=";
-          str += parameter_value;
-          break;
-        case JT808SERVICEPHONENUM:
-          str += "phonenum=";
-          str += parameter_value;
-          break;
-        case JT808SERVICEREPORTINTERVAL:
-          str += "reportinterval=";
-          str += parameter_value;
-          break;
-        default:
-          continue;
-      }
-      if (va_vec.empty()) {
-        break;
-      }
-      str += ",";
-    }
-    str.copy(result, str.size(), 0);
-  }
-
-  return retval;
-}
-
-int Jt808Service::DealSetJt808ServiceRequest(DeviceNode &device,
-                                             std::vector<std::string> &va_vec) {
-  char parameter_value[256] = {0};
-  uint32_t parameter_id = JT808SERVICEIP;
-
-  if (va_vec.size() != 4) {
-    return -1;
-  }
-
-  reverse(va_vec.begin(), va_vec.end());
-  auto va_it = va_vec.begin();
-  while (va_it != va_vec.end()) {
-    memset(parameter_value, 0x0, sizeof(parameter_value));
-    snprintf(parameter_value, sizeof(parameter_value), "%04X:%s",
-             parameter_id, va_it->c_str());
-    *va_it = parameter_value;
-    ++parameter_id;
-    ++va_it;
-  }
-
-  reverse(va_vec.begin(), va_vec.end());
-  return DealSetTerminalParameterRequest(device, va_vec);
-}
-
 int Jt808Service::DealGetTerminalParameterRequest(
                       DeviceNode &device, std::vector<std::string> &va_vec) {
   int retval = -1;
@@ -1516,7 +1062,9 @@ int Jt808Service::DealGetTerminalParameterRequest(
     close(device.socket_fd);
     device.socket_fd = -1;
   } else {
-    propara.terminal_parameter_list = new std::list<TerminalParameter *>;
+    if (propara.terminal_parameter_map == nullptr) {
+      propara.terminal_parameter_map = new std::map<uint32_t, std::string>;
+    }
     while (1) {
       memset(&msg, 0x0, sizeof(msg));
       if (RecvFrameData(device.socket_fd, msg)) {
@@ -1536,20 +1084,18 @@ int Jt808Service::DealGetTerminalParameterRequest(
             continue;
           }
           char parameter_s[512] = {0};
-          for (auto terminal_parameter : *propara.terminal_parameter_list) {
+          for (auto &parameter : *propara.terminal_parameter_map) {
             memset(parameter_s, 0x0, sizeof(parameter_s));
-            u16val = GetParameterTypeByParameterId(
-                         terminal_parameter->parameter_id);
+            u16val = GetParameterTypeByParameterId(parameter.first);
             if (u16val == kStringType) {
               snprintf(parameter_s, sizeof(parameter_s), "%04X:%s",
-                       terminal_parameter->parameter_id,
-                       terminal_parameter->parameter_value);
+                       parameter.first, parameter.second.c_str());
             } else {
               u32val = 0;
-              memcpy(&u32val, terminal_parameter->parameter_value,
-                     terminal_parameter->parameter_len);
+              memcpy(&u32val, parameter.second.c_str(),
+                     parameter.second.size());
               snprintf(parameter_s, sizeof(parameter_s), "%04X:%u",
-                       terminal_parameter->parameter_id, u32val);
+                       parameter.first, u32val);
             }
             arg = parameter_s;
             va_vec.push_back(arg);
@@ -1561,21 +1107,18 @@ int Jt808Service::DealGetTerminalParameterRequest(
       }
     }
   }
-  ClearContainerElement(propara.terminal_parameter_list);
-  delete propara.terminal_parameter_list;
+  propara.terminal_parameter_map->clear();
+  delete propara.terminal_parameter_map;
+  propara.terminal_parameter_map = nullptr;
   return retval;
 }
 
 int Jt808Service::DealSetTerminalParameterRequest(
                       DeviceNode &device, std::vector<std::string> &va_vec) {
   int retval = 0;
-  char parameter_value[256] = {0};
   char value[256] = {0};
-  uint8_t u8val = 0;
-  uint16_t u16val = 0;
   uint16_t data_len = 0;
   uint32_t u32val = 0;
-  uint32_t parameter_id = 0;
   std::string arg;
   ProtocolParameters propara = {0};
   Message msg = {0};
@@ -1591,47 +1134,24 @@ int Jt808Service::DealSetTerminalParameterRequest(
     propara.packet_sequence_num = 1;
   }
 
+  if (propara.terminal_parameter_map == nullptr) {
+    propara.terminal_parameter_map = new std::map<uint32_t, std::string>;
+  }
+
   while (1) {
-    propara.terminal_parameter_list = new std::list<TerminalParameter *>;
     data_len = 0;
     while (!va_vec.empty()) {
       arg = va_vec.back();
       memset(value, 0x0, sizeof(value));
       sscanf(arg.c_str(), "%x:%s", &u32val, value);
-      parameter_id = u32val;
-      memset(parameter_value, 0x0, sizeof(parameter_value));
-      switch (GetParameterTypeByParameterId(parameter_id)) {
-        case kByteType:
-          u8val = atoi(value);
-          memcpy(parameter_value, &u8val, 1);
-          break;
-        case kWordType:
-          u16val = atoi(value);
-          memcpy(parameter_value, &u16val, 2);
-          break;
-        case kDwordType:
-          u32val = atoi(value);
-          memcpy(parameter_value, &u32val, 4);
-          break;
-        case kStringType:
-          memcpy(parameter_value, value, strlen(value));
-          break;
-        case kUnknowType:
-          continue;
-      }
-      if ((data_len + 5 + strlen(value))> 1022) {
-        break;
-      }
       data_len += 5 + strlen(value);
+      if (data_len > 1022) break;
+      propara.terminal_parameter_map->insert(std::make_pair(u32val, value));
       va_vec.pop_back();
-      AddParameterNodeIntoList(propara.terminal_parameter_list,
-                               parameter_id, parameter_value);
     }
-
-    if (propara.terminal_parameter_list->empty()) {
+    if (propara.terminal_parameter_map->empty()) {
       return retval;
     }
-
     PreparePhoneNum(device.phone_num, propara.phone_num);
     Jt808FramePack(msg, DOWN_SETTERMPARA, propara);
     SendFrameData(device.socket_fd, msg);
@@ -1648,8 +1168,7 @@ int Jt808Service::DealSetTerminalParameterRequest(
         }
       }
     }
-    ClearContainerElement(propara.terminal_parameter_list);
-    delete propara.terminal_parameter_list;
+    propara.terminal_parameter_map->clear();
     if (va_vec.empty()) {
       break;
     }
@@ -2324,24 +1843,6 @@ int Jt808Service::ParseCommand(char *buffer) {
           start_upgrade_thread.detach();
           memcpy(buffer, "operation completed.", 20);
         }
-      } else if (arg == "get") {
-        EpollUnregister(epoll_fd_, device_it->socket_fd);
-        arg = va_vec.back();
-        va_vec.pop_back();
-        if (arg == "startup") {
-          retval = DealGetStartupRequest(*device_it, buffer);
-        } else if (arg == "gps") {
-          retval = DealGetGpsRequest(*device_it, buffer);
-        } else if (arg == "cdradio") {
-          retval = DealGetCdradioRequest(*device_it, buffer);
-        } else if (arg == "ntripcors") {
-          retval = DealGetNtripCorsRequest(*device_it, buffer);
-        } else if (arg == "ntripservice") {
-          retval = DealGetNtripServiceRequest(*device_it, buffer);
-        } else if (arg == "jt808service") {
-          retval = DealGetJt808ServiceRequest(*device_it, buffer);
-        }
-        EpollRegister(epoll_fd_, device_it->socket_fd);
       } else if (arg == "getterminalparameter") {
         EpollUnregister(epoll_fd_, device_it->socket_fd);
         retval = DealGetTerminalParameterRequest(*device_it, va_vec);
@@ -2361,23 +1862,7 @@ int Jt808Service::ParseCommand(char *buffer) {
       } else {
         retval = -1;
         EpollUnregister(epoll_fd_, device_it->socket_fd);
-        if (arg == "set") {
-          arg = va_vec.back();
-          va_vec.pop_back();
-          if (arg == "startup") {
-            retval = DealSetStartupRequest(*device_it, va_vec);
-          } else if (arg == "gps") {
-            retval = DealSetGpsRequest(*device_it, va_vec);
-          } else if (arg == "cdradio") {
-            retval = DealSetCdradioRequest(*device_it, va_vec);
-          } else if (arg == "ntripcors") {
-            retval = DealSetNtripCorsRequest(*device_it, va_vec);
-          } else if (arg == "ntripservice") {
-            retval = DealSetNtripServiceRequest(*device_it, va_vec);
-          } else if (arg == "jt808service") {
-            retval = DealSetJt808ServiceRequest(*device_it, va_vec);
-          }
-        } else if (arg == "setterminalparameter") {
+        if (arg == "setterminalparameter") {
           retval = DealSetTerminalParameterRequest(*device_it, va_vec);
         } else if (arg == "setcirculararea") {
           retval = DealSetCircularAreaRequest(*device_it, va_vec);

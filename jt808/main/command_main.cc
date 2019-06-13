@@ -25,8 +25,7 @@ static inline void PrintUsage(void) {
          "\tdelrectanglearea [areaid ...]\n"
          "\tdelpolygonalarea [areaid ...]\n"
          "\tdelroute [routeid ...]\n"
-         "\tupgrade device versionid filepath\n"
-         "\tupgrade gps versionid filepath\n"
+         "\tupgrade device/gps versionid filepath\n"
          "Additional instructions:\n"
          "\tlatitude/longitude -- value in degrees, "
               "accurate to 6 decimal places.\n"
@@ -50,18 +49,7 @@ static inline void PrintUsage(void) {
               "[inflectionpointcount] [inflectionpointitem ...]\n"
          "\tinflectionpointitem -- id(hex) roadsectionid(hex) coordinateitem "
               "roadsectionwide roadsectionattribute(hex) "
-              "[maxdrivingtime] [mindrivingtime] [maxspeed] [overspeedtime]\n"
-         "Customization options:\n"
-         "\tget startup/gps/cdradio/ntripcors/ntripservice/jt808service\n"
-         "\tset startup [gps] [cdradio] [ntripcors] [ntripservice] "
-              "[jt808service]\n"
-         "\tset gps [LOGGGA] [LOGRMC] [LOGATT]\n"
-         "\tset cdradio bauderate workfreqpoint recvmode formcode\n"
-         "\tset ntripcors ip port user passwd mntpoint reportinterval\n"
-         "\tset ntripservice ip port user passwd mntpont reportinterval\n"
-         "\tset jt808service ip port phonenum reportinterval\n"
-         "\tupgrade system versionid filepath\n"
-         "\tupgrade cdradio versionid filepath\n");
+              "[maxdrivingtime] [mindrivingtime] [maxspeed] [overspeedtime]\n");
 }
 
 int main(int argc, char **argv) {

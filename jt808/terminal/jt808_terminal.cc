@@ -26,7 +26,7 @@
 
 
 Jt808Terminal::~Jt808Terminal() {
-  terminal_parameter_list_.clear();
+  terminal_parameter_map_.clear();
   ClearConnect();
   ClearAreaRouteListElement(area_route_set_);
   delete [] area_route_set_.circular_area_list;
@@ -35,14 +35,17 @@ Jt808Terminal::~Jt808Terminal() {
   delete [] area_route_set_.route_list;
 }
 
-void Jt808Terminal::Init() {
+int Jt808Terminal::Init() {
   message_flow_number_ = 0;
   parameter_set_type_ = 0;
-  pro_para_.terminal_parameter_list = nullptr;
   pro_para_.packet_map = nullptr;
   pro_para_.packet_id_list = nullptr;
-  ReadTerminalParameterFormFile(kTerminalParametersFlie,
-                                terminal_parameter_list_);
+  pro_para_.terminal_parameter_id_list = nullptr;
+  if (ReadTerminalParameterFormFile(kTerminalParametersFlie,
+                                    terminal_parameter_map_) < 0) {
+    return -1;
+  }
+
   alarm_bit_.value = 0;
   status_bit_.value = 0;
   status_bit_.bit.acc = 1;
@@ -63,6 +66,8 @@ void Jt808Terminal::Init() {
   area_route_set_.route_list = new std::list<Route *>;
   ReadAreaRouteFormFile(kAreaRouteFlie, area_route_set_);
   WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
+
+  return 0;
 }
 
 int Jt808Terminal::RequestConnectServer(void) {
@@ -306,51 +311,45 @@ int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
       u16val = EndianSwap16(pro_para_.respond_flow_num);
       memcpy(msg_body, &u16val, 2);
       msg_body += 2;
-      message_.size += 2;
-      msghead_ptr->attribute.bit.msglen += 2;
-      if ((pro_para_.terminal_parameter_list != nullptr) &&
-        !pro_para_.terminal_parameter_list->empty()) {
-        // terminal parameters total num.
-        *msg_body = pro_para_.respond_para_num;
-        msg_body++;
-        message_.size++;
-        msghead_ptr->attribute.bit.msglen++;
-        // pack parameters list.
-        for (auto &parameter : *pro_para_.terminal_parameter_list) {
-          u32val = EndianSwap32(parameter->parameter_id);
-          memcpy(msg_body, &u32val, 4);
-          msg_body += 4;
-          u8val = parameter->parameter_len;
-          memcpy(msg_body, &u8val, 1);
-          msg_body++;
-          switch (GetParameterTypeByParameterId(parameter->parameter_id)) {
-            case kWordType:
-              memcpy(&u16val, parameter->parameter_value, u8val);
-              u16val = EndianSwap16(u16val);
-              memcpy(msg_body, &u16val, u8val);
-              break;
-            case kDwordType:
-              memcpy(&u32val, parameter->parameter_value, u8val);
-              u32val = EndianSwap32(u32val);
-              memcpy(msg_body, &u32val, u8val);
-              break;
-            case kByteType:
-            case kStringType:
-              memcpy(msg_body, parameter->parameter_value, u8val);
-              break;
-            case kUnknowType:
-            default:
-              break;
-          }
-          msg_body += u8val;
-          message_.size += 5 + u8val;
-          msghead_ptr->attribute.bit.msglen += 5 + u8val;
+      *msg_body++ = pro_para_.terminal_parameter_id_list->size();
+      message_.size += 3;
+      msghead_ptr->attribute.bit.msglen += 3;
+      for (auto &parameter_id : *pro_para_.terminal_parameter_id_list) {
+        u32val = EndianSwap32(parameter_id);
+        memcpy(msg_body, &u32val, 4);
+        msg_body += 4;
+        std::string parameter_value = terminal_parameter_map_[parameter_id];
+        switch (GetParameterTypeByParameterId(parameter_id)) {
+          case kByteType:
+            *msg_body++ = 1;
+            *msg_body++ = atoi(parameter_value.c_str());
+            u8val = 2;
+            break;
+          case kWordType:
+            *msg_body++ = 2;
+            u16val = atoi(parameter_value.c_str());
+            u16val = EndianSwap16(u16val);
+            memcpy(msg_body, &u16val, 2);
+            msg_body += 2;
+            u8val = 3;
+            break;
+          case kDwordType:
+            *msg_body++ = 4;
+            u32val = atoi(parameter_value.c_str());
+            u32val = EndianSwap32(u32val);
+            memcpy(msg_body, &u32val, 4);
+            msg_body += 4;
+            u8val = 5;
+            break;
+          case kStringType:
+            *msg_body++ = parameter_value.size();
+            memcpy(msg_body, parameter_value.c_str(), parameter_value.size());
+            msg_body += parameter_value.size();
+            u8val = 1 + parameter_value.size();
+            break;
         }
-      } else {
-        *msg_body = 0;
-        msg_body++;
-        message_.size++;
-        msghead_ptr->attribute.bit.msglen++;
+        message_.size += 4 + u8val;
+        msghead_ptr->attribute.bit.msglen += 4 + u8val;
       }
       break;
     case UP_UPDATERESULT:
@@ -460,45 +459,13 @@ int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
   message_.buffer[0] = PROTOCOL_SIGN;
   message_.buffer[message_.size++] = PROTOCOL_SIGN;
 
-  printf("%s[%d]: socket-send:\n", __FUNCTION__, __LINE__);
+  printf("%s[%d]: socket-send[%lu]:\n", __FUNCTION__, __LINE__, message_.size);
   for (uint16_t i = 0; i < message_.size; ++i) {
     printf("%02X ", message_.buffer[i]);
   }
   printf("\r\n");
 
   return message_.size;
-}
-
-void Jt808Terminal::PrepareTerminalParaList(
-                    std::list<TerminalParameter *> &para_list,
-                    const uint8_t *src) {
-  TerminalParameter *node;
-
-  if (src == nullptr) {
-   auto it = terminal_parameter_list_.begin();
-   while (it != terminal_parameter_list_.end()) {
-    node = new TerminalParameter;
-    memset(node, 0x0, sizeof(*node));
-    memcpy(node, &(*it), sizeof(TerminalParameter));
-    para_list.push_back(node);
-    ++it;
-   }
-  } else {
-    uint8_t para_count = *src++;
-    uint32_t parameter_id;
-    TerminalParameter raw_node;
-    while (para_count--) {
-      node = new TerminalParameter;
-      memset(node, 0x0, sizeof(*node));
-      memcpy(&parameter_id, &src[0], 4);
-      parameter_id = EndianSwap32(parameter_id);
-      GetNodeFromTerminalParameterListById(terminal_parameter_list_,
-                                           parameter_id, raw_node);
-      memcpy(node, &raw_node, sizeof(raw_node));
-      para_list.push_back(node);
-      src += 4;
-    }
-  }
 }
 
 uint16_t Jt808Terminal::Jt808FrameParse() {
@@ -510,11 +477,12 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
   uint16_t message_id;
   uint32_t u32val;
   std::ofstream ofs;
-  std::list<TerminalParameter *> terminal_parameter_list;
+  std::vector<uint32_t> terminal_parameter_id_list;
   MessageHead *msghead_ptr;
   MessageBodyAttr msgbody_attribute = {0};
 
-  // printf("%s[%d]: socket-recv:\n", __FUNCTION__, __LINE__);
+  // printf("%s[%d]: socket-recv[%lu]:\n",
+  //        __FUNCTION__, __LINE__, message_.size);
   // for (size_t i = 0; i < message_.size; ++i)
   //   printf("%02X ", message_.buffer[i]);
   // printf("\n");
@@ -543,6 +511,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
         case UP_HEARTBEAT:
           printf("%s[%d]: received heartbeat respond: ",
                  __FUNCTION__, __LINE__);
+          break;
         case UP_AUTHENTICATION:
           printf("%s[%d]: received authenitcation respond: ",
                  __FUNCTION__, __LINE__);
@@ -619,38 +588,40 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
       break;
     case DOWN_SETTERMPARA:
       int para_count;
+      char value[256];
       para_count = static_cast<int>(msg_body[0]);
       msg_body++;
       while (para_count-- > 0) {
-        if (terminal_parameter_list_.empty()) {
+        if (terminal_parameter_map_.empty()) {
           pro_para_.respond_result = kFailure;
           break;
         }
-        // terminal parameter id.
-        memcpy(&u32val, msg_body, 4);
+        memcpy(&u32val, msg_body, 4);  // terminal parameter id.
         u32val = EndianSwap32(u32val);
         msg_body += 4;
-        // terminal parameter count.
-        u8val = msg_body[0];
+        u8val = msg_body[0];  // terminal parameter len.
         msg_body++;
-        for (auto &parameter : terminal_parameter_list_) {
-          if (parameter.parameter_id == u32val) {
+        for (auto &parameter : terminal_parameter_map_) {
+          if (parameter.first == u32val) {
             switch (GetParameterTypeByParameterId(u32val)) {
+              case kByteType:
+                u8val = *msg_body;
+                parameter.second = std::to_string(u8val);
+                break;
               case kWordType:
                 memcpy(&u16val, &msg_body[0], 2);
                 u16val = EndianSwap16(u16val);
-                memcpy(parameter.parameter_value, &u16val, u8val);
+                parameter.second = std::to_string(u16val);
                 break;
               case kDwordType:
                 memcpy(&u32val, &msg_body[0], 4);
                 u32val = EndianSwap32(u32val);
-                memcpy(parameter.parameter_value, &u32val, u8val);
+                parameter.second = std::to_string(u32val);
                 break;
-              case kByteType:
               case kStringType:
-                memcpy(parameter.parameter_value, &msg_body[0], u8val);
-                parameter.parameter_value[u8val] = 0;
-                parameter.parameter_len = u8val;
+                memset(value, 0x0, 256);
+                memcpy(value, &msg_body[0], u8val);
+                parameter.second = value;
                 break;
               default:
                 printf("unknow type\n");
@@ -664,6 +635,8 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
 
       if (para_count < 0) {
         pro_para_.respond_result = kSuccess;
+        WriteTerminalParameterToFile(kTerminalParametersFlie,
+                                     terminal_parameter_map_);
       }
       memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
       Jt808FramePack(UP_UNIRESPONSE);
@@ -672,50 +645,80 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
     case DOWN_GETTERMPARA:
     case DOWN_GETSPECTERMPARA:
       uint16_t data_len;
-      if (message_id == DOWN_GETTERMPARA) {
-        pro_para_.respond_para_num = terminal_parameter_list_.size();
-        PrepareTerminalParaList(terminal_parameter_list, nullptr);
+      int parameter_type;
+      if (message_id == DOWN_GETTERMPARA) {  // Get all terminal parameter.
+        pro_para_.respond_para_num = terminal_parameter_map_.size();
+        for (auto &parameter : terminal_parameter_map_) {
+          terminal_parameter_id_list.push_back(parameter.first);
+        }
       } else {
         pro_para_.respond_para_num = msg_body[0];
-        PrepareTerminalParaList(terminal_parameter_list, &msg_body[0]);
+        if (PrepareTerminalParameterIdList(&msg_body[1], msg_body[0],
+                                           terminal_parameter_map_,
+                                           &terminal_parameter_id_list) < 0) {
+          memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
+          pro_para_.respond_result = kNotSupport;
+          Jt808FramePack(UP_UNIRESPONSE);
+          SendFrameData();
+          return message_id;
+        }
       }
       data_len = 0;
-      for (auto &parameter: terminal_parameter_list) {
-        data_len += 5 + parameter->parameter_len;
+      for (auto &parameter_id : terminal_parameter_id_list) {
+        data_len += 5;
+        parameter_type = GetParameterTypeByParameterId(parameter_id);
+        if (parameter_type != kStringType) {
+          data_len += GetParameterLengthByParameterType(parameter_type);
+        } else {
+          data_len += terminal_parameter_map_[parameter_id].size();
+        }
       }
-      if (data_len > 1022) {
-        pro_para_.packet_total_num = data_len/1022 + 1;
+      if (data_len > MAX_TERMINAL_PARAMETER_LEN_A_RECORD) {  // Need packet.
+        pro_para_.packet_total_num =
+            data_len/MAX_TERMINAL_PARAMETER_LEN_A_RECORD + 1;
         pro_para_.packet_sequence_num = 1;
       }
-      pro_para_.terminal_parameter_list = new std::list<TerminalParameter *>;
-      for (auto parameter_it = terminal_parameter_list.begin();
-           parameter_it != terminal_parameter_list.end(); ) {
+      int retval;
+      if (pro_para_.terminal_parameter_id_list == nullptr) {
+        pro_para_.terminal_parameter_id_list = new std::vector<uint32_t>;
+      }
+      for (auto parameter_id_it = terminal_parameter_id_list.begin();
+           parameter_id_it != terminal_parameter_id_list.end(); ) {
         data_len = 0;
-        while (parameter_it != terminal_parameter_list.end()) {
-          if ((data_len + 5 + (*parameter_it)->parameter_len) > 1022) {
-            break;
+        while (parameter_id_it != terminal_parameter_id_list.end()) {
+          data_len += 5;
+          parameter_type = GetParameterTypeByParameterId(*parameter_id_it);
+          if (parameter_type != kStringType) {
+            data_len += GetParameterLengthByParameterType(parameter_type);
+          } else {
+            data_len += terminal_parameter_map_[*parameter_id_it].size();
           }
-          data_len += 5 + (*parameter_it)->parameter_len;
-          pro_para_.terminal_parameter_list->push_back(*parameter_it);
-          ++parameter_it;
+          if (data_len > MAX_TERMINAL_PARAMETER_LEN_A_RECORD) break;
+          pro_para_.terminal_parameter_id_list->push_back(*parameter_id_it);
+          ++parameter_id_it;
         }
         memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
         Jt808FramePack(UP_GETPARARESPONSE);
-        pro_para_.terminal_parameter_list->clear();
+        pro_para_.terminal_parameter_id_list->clear();
         SendFrameData();
         while (1) {
-          if (!RecvFrameData() && message_.size) {
+          if ((retval = RecvFrameData()) > 0) {
             Jt808FrameParse();
             if (pro_para_.respond_id == UP_GETPARARESPONSE) {
               break;
             }
+          } else if (retval < 0) {
+            break;
           }
         }
+        if (retval < 0) break;
         if (pro_para_.packet_total_num > pro_para_.packet_sequence_num) {
           ++pro_para_.packet_sequence_num;
         }
       }
-      ClearContainerElement(terminal_parameter_list);
+      delete pro_para_.terminal_parameter_id_list;
+      pro_para_.terminal_parameter_id_list = nullptr;
+      terminal_parameter_id_list.clear();
       pro_para_.packet_total_num = pro_para_.packet_sequence_num = 0;
       break;
     case DOWN_TERMINALCONTROL:
@@ -828,16 +831,16 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
                      "%s/%s-Ver%s.bin", kDownloadDir, "GPS",
                      msg_body[6] > 0 ? upgrade_info_.version_id : "20180922");
             break;
-          default: // unknow type id, return not support msessage.
+          default: // Unknow type id, return not support msessage.
             pro_para_.respond_result = kNotSupport;
             memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
             Jt808FramePack(UP_UNIRESPONSE);
             SendFrameData();
             return message_id;
         }
-        // in case it already exists.
+        // In case it already exists.
         unlink(upgrade_info_.file_path);
-        // write to lcoal file.
+        // Write to file.
         ofs.open(upgrade_info_.file_path,
                  std::ios::binary | std::ios::out | std::ios::app);
         if (ofs.is_open()) {
@@ -1347,6 +1350,12 @@ int Jt808Terminal::ReportPosition(void) {
   return (SendFrameData() >= 0 ? 0 : -1);
 }
 
+int Jt808Terminal::HeartBeat(void) {
+  memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
+  Jt808FramePack(UP_HEARTBEAT);
+  return (SendFrameData() >= 0 ? 0 : -1);
+}
+
 void Jt808Terminal::ReportUpgradeResult(void) {
   struct dirent *dirent_ptr;
   std::string str;
@@ -1373,7 +1382,7 @@ void Jt808Terminal::ReportUpgradeResult(void) {
         Jt808FramePack(UP_UPDATERESULT);
         if (!SendFrameData()) {
           str = "/tmp/" + str;
-          // remove file.
+          // Remove file.
           unlink(str.c_str());
         }
       }
