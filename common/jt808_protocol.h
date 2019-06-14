@@ -16,7 +16,7 @@
 #define UP_LOGOUT                       0x0101  // 终端注销
 #define UP_AUTHENTICATION               0x0102  // 终端鉴权
 #define UP_GETPARARESPONSE              0x0104  // 查询终端参数应答
-#define UP_UPDATERESULT                 0x0108  // 终端升级结果
+#define UP_UPGRADERESULT                 0x0108  // 终端升级结果
 #define UP_POSITIONREPORT               0x0200  // 位置信息上报
 #define UP_GETPOSITIONINFORESPONSE      0x0201  // 位置信息查询应答
 #define UP_VEHICLECONTROLRESPONSE       0x0500  // 车辆控制应答
@@ -30,7 +30,7 @@
 #define DOWN_GETTERMPARA        0x8104  // 查询终端参数
 #define DOWN_TERMINALCONTROL    0x8105  // 终端控制
 #define DOWN_GETSPECTERMPARA    0x8106  // 查询指定终端参数
-#define DOWN_UPDATEPACKAGE      0x8108  // 下发终端升级包
+#define DOWN_UPGRADEPACKAGE      0x8108  // 下发终端升级包
 #define DOWN_GETPOSITIONINFO    0x8201  // 查询位置信息
 #define DOWN_POSITIONTRACK      0x8202  // 位置跟踪
 #define DOWN_VEHICLECONTROL     0x8500  // 车辆控制

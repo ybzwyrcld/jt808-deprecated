@@ -352,7 +352,7 @@ int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
         msghead_ptr->attribute.bit.msglen += 4 + u8val;
       }
       break;
-    case UP_UPDATERESULT:
+    case UP_UPGRADERESULT:
       *msg_body = pro_para_.upgrade_type;
       msg_body++;
       *msg_body = pro_para_.respond_result;
@@ -733,12 +733,12 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
       Jt808FramePack(UP_UNIRESPONSE);
       SendFrameData();
       break;
-    case DOWN_UPDATEPACKAGE:
+    case DOWN_UPGRADEPACKAGE:
       uint8_t *packet_ptr;
       uint16_t packet_seq;
       uint16_t packet_total;
       uint32_t packet_len;
-      printf("%s[%d]: received update package\r\n", __FUNCTION__, __LINE__);
+      printf("%s[%d]: received upgrade package\r\n", __FUNCTION__, __LINE__);
       if (msgbody_attribute.bit.package) {
         memcpy(&u16val, &message_.buffer[13], 2);
         pro_para_.packet_total_num = EndianSwap16(u16val);
@@ -1384,7 +1384,7 @@ void Jt808Terminal::ReportUpgradeResult(void) {
           pro_para_.respond_result = kNotSupport;
         }
         memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-        Jt808FramePack(UP_UPDATERESULT);
+        Jt808FramePack(UP_UPGRADERESULT);
         if (!SendFrameData()) {
           str = "/tmp/" + str;
           // Remove file.

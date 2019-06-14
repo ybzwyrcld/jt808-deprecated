@@ -231,7 +231,7 @@ void Jt808Service::Run(const int &time_out) {
                 int cmd = Jt808FrameParse(msg, propara);
                 switch (cmd) {
                   case UP_HEARTBEAT:
-                  case UP_UPDATERESULT:
+                  case UP_UPGRADERESULT:
                   case UP_POSITIONREPORT:
                     memset(msg.buffer, 0x0, sizeof(msg.buffer));
                     msg.size = Jt808FramePack(msg, DOWN_UNIRESPONSE, propara);
@@ -429,7 +429,7 @@ int Jt808Service::Jt808FramePack(Message &msg,
       msg.size++;
       msghead_ptr->attribute.bit.msglen += 1;
       break;
-    case DOWN_UPDATEPACKAGE:
+    case DOWN_UPGRADEPACKAGE:
       if (propara.packet_total_num > 1) {
         msghead_ptr->attribute.bit.package = 1;
         u16val = EndianSwap16(propara.packet_total_num);
@@ -777,8 +777,8 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
       memcpy(&u16val, &msg_body[2], 2);
       propara.respond_id = EndianSwap16(u16val);
       switch(propara.respond_id) {
-        case DOWN_UPDATEPACKAGE:
-          printf("%s[%d]: received updatepackage respond: ",
+        case DOWN_UPGRADEPACKAGE:
+          printf("%s[%d]: received upgrade package respond: ",
                  __FUNCTION__, __LINE__);
           if (propara.packet_total_num && (msg_body[4] == kSuccess)) {
             propara.packet_response_success_num++;
@@ -847,7 +847,7 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
       }
       break;
     case UP_HEARTBEAT:
-      printf("%s[%d]: received heartbeat: ", __FUNCTION__, __LINE__);
+      printf("%s[%d]: received heartbeat\r\n", __FUNCTION__, __LINE__);
       break;
     case UP_REGISTER:
       memcpy(propara.phone_num, msghead_ptr->phone, 6);
@@ -932,8 +932,8 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
       }
       propara.respond_result = kSuccess;
       break;
-    case UP_UPDATERESULT:
-      printf("%s[%d]: received update result: ", __FUNCTION__, __LINE__);
+    case UP_UPGRADERESULT:
+      printf("%s[%d]: received upgrade result: ", __FUNCTION__, __LINE__);
       if (msg_body[4] == 0x00) {
         printf("normal\r\n");
       } else if (msg_body[4] == 0x01) {
@@ -1958,7 +1958,7 @@ bool Jt808Service::CheckPacketComplete(int &sock, ProtocolParameters &propara) {
                 break;
               } else if (msg.size > 0) {
                 if ((Jt808FrameParse(msg, propara) == UP_UNIRESPONSE) &&
-                    (propara.respond_id == DOWN_UPDATEPACKAGE)) {
+                    (propara.respond_id == DOWN_UPGRADEPACKAGE)) {
                   break;
                 }
               }
@@ -2019,7 +2019,7 @@ void Jt808Service::UpgradeHandler(void) {
             memcpy(propara.packet_data,
                    data + max_data_len * (propara.packet_sequence_num - 1),
                    propara.packet_data_len);
-            msg.size = Jt808FramePack(msg, DOWN_UPDATEPACKAGE, propara);
+            msg.size = Jt808FramePack(msg, DOWN_UPGRADEPACKAGE, propara);
             propara.packet_map->insert(
                 std::make_pair(propara.packet_sequence_num, msg));
             if (SendFrameData(device.socket_fd, msg)) {
@@ -2034,7 +2034,7 @@ void Jt808Service::UpgradeHandler(void) {
                   break;
                 } else if (msg.size > 0) {
                   if ((Jt808FrameParse(msg, propara) == UP_UNIRESPONSE) &&
-                      (propara.respond_id == DOWN_UPDATEPACKAGE)) {
+                      (propara.respond_id == DOWN_UPGRADEPACKAGE)) {
                     break;
                   }
                 }
