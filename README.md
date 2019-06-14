@@ -10,7 +10,7 @@
 
 ### 下载源码及编译
 ```bash
-$ git clone https://github.com/hanoi404/jt808 && cd jt808/jt808
+$ git clone https://github.com/hanoi404/jt808 && cd jt808
 $ make all
 ```
 
@@ -42,7 +42,7 @@ $ sudo apt-get install cmake cmake-curses-gui
 
 ### 下载源码
 ```bash
-$ git clone https://github.com/hanoi404/jt808 && cd jt808/jt808
+$ git clone https://github.com/hanoi404/jt808 && cd jt808
 $ mkdir build
 ```
 
@@ -88,70 +88,7 @@ $ ./jt808command
 然后根据提示正确输入完整命令.
 
 ### 生成 debug 版和 release 版的程序
-
-以后台程序为例:
 ```bash
-$ ccmake ../..
+$ ccmake ..
 ```
-
-第一次可能出现以下界面, 输入`c`继续下一步:
-```bash
-                                                     Page 0 of 1
-                                                      EMPTY CACHE
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-EMPTY CACHE:
-Press [enter] to edit option                                                                                                 CMake Version 3.5.1]
-Press [c] to configure
-Press [h] for help           Press [q] to quit without generating
-Press [t] to toggle advanced mode (Currently Off)
-```
-
-出现以下界面时，光标移动到`CMAKE_BUILD_TYPE`行上面, 输入`Enter`键进行编辑, 填写`Debug`或`Release`, 完成后再次输入`Enter`键退出编辑, 然后`c`键进行配置, 再输入`g`键生成`Makefile`:
-```bash
-                                                     Page 1 of 1
-CMAKE_BUILD_TYPE                *
-CMAKE_INSTALL_PREFIX            */usr/local
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-CMAKE_BUILD_TYPE: Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.)
-Press [enter] to edit option                                                                                                 CMake Version 3.5.1]
-Press [c] to configure
-Press [h] for help           Press [q] to quit without generating
-Press [t] to toggle advanced mode (Currently Off)
-```
-
-编译
-```bash
-$ make
-```
+编辑`CMAKE_BUILD_TYPE`行, 填写`Debug`或`Release`.

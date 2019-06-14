@@ -266,13 +266,13 @@ int Jt808Service::SendFrameData(const int &fd, const Message &msg) {
       ret = 0;
     } else {
       if (errno == EPIPE) {
-        printf("%s[%d]: remote socket close!!!\n", __FILE__, __LINE__);
+        printf("%s[%d]: remote socket close!!!\n", __FUNCTION__, __LINE__);
       }
       ret = -1;
-      printf("%s[%d]: send data failed!!!\n", __FILE__, __LINE__);
+      printf("%s[%d]: send data failed!!!\n", __FUNCTION__, __LINE__);
     }
   } else if (ret == 0) {
-    printf("%s[%d]: connection disconect!!!\n", __FILE__, __LINE__);
+    printf("%s[%d]: connection disconect!!!\n", __FUNCTION__, __LINE__);
     ret = -1;
   }
 
@@ -289,13 +289,13 @@ int Jt808Service::RecvFrameData(const int &fd, Message &msg) {
       ret = 0;
     } else {
       ret = -1;
-      printf("%s[%d]: recv data failed!!!\n", __FILE__, __LINE__);
+      printf("%s[%d]: recv data failed!!!\n", __FUNCTION__, __LINE__);
     }
     msg.size = 0;
   } else if (ret == 0) {
     ret = -1;
     msg.size = 0;
-    printf("%s[%d]: connection disconect!!!\n", __FILE__, __LINE__);
+    printf("%s[%d]: connection disconect!!!\n", __FUNCTION__, __LINE__);
   } else {
     msg.size = ret;
   }
@@ -400,6 +400,7 @@ int Jt808Service::Jt808FramePack(Message &msg,
             u8val = 1 + parameter.second.size();
             break;
           default:
+            u8val = 0;
             break;
         }
         msg_body += u8val;
@@ -731,7 +732,7 @@ int Jt808Service::Jt808FramePack(Message &msg,
   msg.buffer[0] = PROTOCOL_SIGN;
   msg.buffer[msg.size++] = PROTOCOL_SIGN;
 
-  printf("%s[%d]: socket-send[%lu]:\n", __FILE__, __LINE__, msg.size);
+  printf("%s[%d]: socket-send[%lu]:\n", __FUNCTION__, __LINE__, msg.size);
   for (uint16_t i = 0; i < msg.size; ++i) {
     printf("%02X ", msg.buffer[i]);
   }
@@ -750,7 +751,7 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
   MessageHead *msghead_ptr;
   MessageBodyAttr msgbody_attribute;
 
-  // printf("%s[%d]: socket-recv[%lu]:\n", __FILE__, __LINE__, msg.size);
+  // printf("%s[%d]: socket-recv[%lu]:\n", __FUNCTION__, __LINE__, msg.size);
   // for (uint16_t i = 0; i < msg.size; ++i) {
   //   printf("%02X ", msg.buffer[i]);
   // }
@@ -778,56 +779,58 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
       switch(propara.respond_id) {
         case DOWN_UPDATEPACKAGE:
           printf("%s[%d]: received updatepackage respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           if (propara.packet_total_num && (msg_body[4] == kSuccess)) {
             propara.packet_response_success_num++;
           }
           break;
         case DOWN_SETTERMPARA:
           printf("%s[%d]: received set terminal parameter respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_TERMINALCONTROL:
           printf("%s[%d]: received terminal control respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_POSITIONTRACK:
           printf("%s[%d]: received position track respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_SETCIRCULARAREA:
           printf("%s[%d]: received set circular area respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_DELCIRCULARAREA:
           printf("%s[%d]: received delete circular area respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_SETRECTANGLEAREA:
           printf("%s[%d]: received set rectangle area respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_DELRECTANGLEAREA:
           printf("%s[%d]: received delete rectangle area respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_SETPOLYGONALAREA:
           printf("%s[%d]: received set polygonal area respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_DELPOLYGONALAREA:
           printf("%s[%d]: received delete polygonal area respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_SETROUTE:
-          printf("%s[%d]: received set route respond: ", __FILE__, __LINE__);
+          printf("%s[%d]: received set route respond: ",
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_DELROUTE:
-          printf("%s[%d]: received delete route respond: ", __FILE__, __LINE__);
+          printf("%s[%d]: received delete route respond: ",
+                 __FUNCTION__, __LINE__);
           break;
         case DOWN_PASSTHROUGH:
           printf("%s[%d]: received down passthrough respond: ",
-                 __FILE__, __LINE__);
+                 __FUNCTION__, __LINE__);
           break;
         default:
           break;
@@ -842,6 +845,9 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
       } else if (msg_body[4] == kNotSupport) {
         printf("message not support\r\n");
       }
+      break;
+    case UP_HEARTBEAT:
+      printf("%s[%d]: received heartbeat: ", __FUNCTION__, __LINE__);
       break;
     case UP_REGISTER:
       memcpy(propara.phone_num, msghead_ptr->phone, 6);
@@ -883,7 +889,7 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
       break;
     case UP_GETPARARESPONSE:
       printf("%s[%d]: received get terminal parameter respond\n",
-             __FILE__, __LINE__);
+             __FUNCTION__, __LINE__);
       char parameter_value[256];
       uint32_t parameter_id;
       int parameter_count;
@@ -927,7 +933,7 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
       propara.respond_result = kSuccess;
       break;
     case UP_UPDATERESULT:
-      printf("%s[%d]: received updateresult: ", __FILE__, __LINE__);
+      printf("%s[%d]: received update result: ", __FUNCTION__, __LINE__);
       if (msg_body[4] == 0x00) {
         printf("normal\r\n");
       } else if (msg_body[4] == 0x01) {
@@ -940,22 +946,22 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
       propara.respond_result = kSuccess;
       break;
     case UP_GETPOSITIONINFORESPONSE:
-      printf("%s[%d]: received get position info:\n", __FILE__, __LINE__);
+      printf("%s[%d]: received get position info:\n", __FUNCTION__, __LINE__);
       ParsePositionReport(msg.buffer, msg.size, 2);
       propara.respond_result = kSuccess;
       break;
     case UP_POSITIONREPORT:
-      printf("%s[%d]: received position report:\n", __FILE__, __LINE__);
+      printf("%s[%d]: received position report:\n", __FUNCTION__, __LINE__);
       ParsePositionReport(msg.buffer, msg.size, 0);
       propara.respond_result = kSuccess;
       break;
     case UP_VEHICLECONTROLRESPONSE:
-      printf("%s[%d]: received vehicle control:\n", __FILE__, __LINE__);
+      printf("%s[%d]: received vehicle control:\n", __FUNCTION__, __LINE__);
       ParsePositionReport(msg.buffer, msg.size, 2);
       propara.respond_result = kSuccess;
       break;
     case UP_PASSTHROUGH:
-      printf("%s[%d]: received up passthrough\n", __FILE__, __LINE__);
+      printf("%s[%d]: received up passthrough\n", __FUNCTION__, __LINE__);
       if (propara.pass_through == nullptr) {
         propara.pass_through = new PassThrough;
         memset(propara.pass_through, 0x0, sizeof(PassThrough));
@@ -968,7 +974,7 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
       propara.respond_result = kSuccess;
       break;
     case UP_CANBUSDATAUPLOAD:
-      printf("%s[%d]: received up can bus data:\n", __FILE__, __LINE__);
+      printf("%s[%d]: received up can bus data:\n", __FUNCTION__, __LINE__);
       if (propara.can_bus_data_list == nullptr) {
         propara.can_bus_data_list = new std::vector<CanBusData*>;
       }

@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(jt808service)
+project(jt808)
 
-set(JT808_SERVICE_VERSION_MAJOR 1)
-set(JT808_SERVICE_VERSION_MINOR 0)
+set(JT808_VERSION_MAJOR 1)
+set(JT808_VERSION_MINOR 0)
 
 set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
