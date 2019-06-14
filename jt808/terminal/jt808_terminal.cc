@@ -646,6 +646,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
     case DOWN_GETSPECTERMPARA:
       uint16_t data_len;
       int parameter_type;
+      int respond_flow_num;
       if (message_id == DOWN_GETTERMPARA) {  // Get all terminal parameter.
         pro_para_.respond_para_num = terminal_parameter_map_.size();
         for (auto &parameter : terminal_parameter_map_) {
@@ -674,6 +675,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
         }
       }
       if (data_len > MAX_TERMINAL_PARAMETER_LEN_A_RECORD) {  // Need packet.
+        respond_flow_num = pro_para_.respond_flow_num;
         pro_para_.packet_total_num =
             data_len/MAX_TERMINAL_PARAMETER_LEN_A_RECORD + 1;
         pro_para_.packet_sequence_num = 1;
@@ -698,6 +700,9 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
           ++parameter_id_it;
         }
         memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
+        if (pro_para_.packet_total_num > 0) {
+          pro_para_.respond_flow_num = respond_flow_num;
+        }
         Jt808FramePack(UP_GETPARARESPONSE);
         pro_para_.terminal_parameter_id_list->clear();
         SendFrameData();
