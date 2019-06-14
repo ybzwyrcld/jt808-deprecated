@@ -909,17 +909,20 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
         msg_body++;
         memset(parameter_value, 0x0, sizeof(parameter_value));
         switch (GetParameterTypeByParameterId(parameter_id)) {
+          case kByteType:
+            snprintf(parameter_value, sizeof(parameter_value),
+                     "%u", msg_body[0]);
+            break;
           case kWordType:
             memcpy(&u16val, &msg_body[0], u8val);
             u16val = EndianSwap16(u16val);
-            memcpy(parameter_value, &u16val, u8val);
+            snprintf(parameter_value, sizeof(parameter_value), "%u", u16val);
             break;
           case kDwordType:
             memcpy(&u32val, &msg_body[0], u8val);
             u32val = EndianSwap32(u32val);
-            memcpy(parameter_value, &u32val, u8val);
+            snprintf(parameter_value, sizeof(parameter_value), "%u", u32val);
             break;
-          case kByteType:
           case kStringType:
             memcpy(parameter_value, &msg_body[0], u8val);
             break;
@@ -1037,7 +1040,6 @@ uint16_t Jt808Service::Jt808FrameParse(Message &msg,
 int Jt808Service::DealGetTerminalParameterRequest(
                       DeviceNode &device, std::vector<std::string> &va_vec) {
   int retval = -1;
-  uint16_t u16val;
   uint32_t u32val;
   uint32_t parameter_id;
   std::string arg;
@@ -1092,19 +1094,9 @@ int Jt808Service::DealGetTerminalParameterRequest(
           char parameter_s[512] = {0};
           for (auto &parameter : *propara.terminal_parameter_map) {
             memset(parameter_s, 0x0, sizeof(parameter_s));
-            u16val = GetParameterTypeByParameterId(parameter.first);
-            if (u16val == kStringType) {
-              snprintf(parameter_s, sizeof(parameter_s), "%04X:%s",
-                       parameter.first, parameter.second.c_str());
-            } else {
-              u32val = 0;
-              memcpy(&u32val, parameter.second.c_str(),
-                     parameter.second.size());
-              snprintf(parameter_s, sizeof(parameter_s), "%04X:%u",
-                       parameter.first, u32val);
-            }
-            arg = parameter_s;
-            va_vec.push_back(arg);
+            snprintf(parameter_s, sizeof(parameter_s), "%04X:%s",
+                     parameter.first, parameter.second.c_str());
+            va_vec.push_back(parameter_s);
           }
           reverse(va_vec.begin(), va_vec.end());
           retval = 0;
