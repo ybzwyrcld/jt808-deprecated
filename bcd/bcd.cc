@@ -1,7 +1,5 @@
 #include "bcd/bcd.h"
 
-#include <string.h>
-
 
 unsigned char BcdFromHex(const unsigned char &src) {
   unsigned char temp;
@@ -18,7 +16,7 @@ unsigned char HexFromBcd(const unsigned char &src) {
   return temp;
 }
 
-char *BcdFromStringCompress(const char *src, char *dst, const int &srclen) {
+char *BcdFromStringCompress(const char *src, char *dst, const size_t &srclen) {
   char *ptr = dst;
   unsigned char temp;
 
@@ -39,7 +37,7 @@ char *BcdFromStringCompress(const char *src, char *dst, const int &srclen) {
   return dst;
 }
 
-char *StringFromBcdCompress(const char *src, char *dst, const int &srclen) {
+char *StringFromBcdCompress(const char *src, char *dst, const size_t &srclen) {
   char *ptr = dst;
   unsigned char temp;
   int cnt = srclen;

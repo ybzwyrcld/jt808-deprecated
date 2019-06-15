@@ -10,7 +10,7 @@
 
 static inline uint16_t EndianSwap16(const uint16_t &value) {
   assert(sizeof(value) == 2);
-  return (((value & 0xff) << 8) | (value >> 8));
+  return static_cast<uint16_t>(((value & 0xff) << 8) | (value >> 8));
 }
 
 static inline uint32_t EndianSwap32(const uint32_t &value) {
@@ -21,9 +21,9 @@ static inline uint32_t EndianSwap32(const uint32_t &value) {
           (value << 24));
 }
 
-uint8_t BccCheckSum(const uint8_t *src, const int &len);
-uint16_t Escape(uint8_t *src, const int &len);
-uint16_t ReverseEscape(uint8_t *src, const int &len);
+uint8_t BccCheckSum(const uint8_t *src, const size_t &len);
+size_t Escape(uint8_t *src, const size_t &len);
+size_t ReverseEscape(uint8_t *src, const size_t &len);
 
 static inline void PreparePhoneNum(const char *src, uint8_t *bcd_array) {
   char phone_num[6] = {0};

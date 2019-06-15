@@ -40,7 +40,7 @@ class Jt808Terminal {
   int SendFrameData(void);
   int RecvFrameData(void);
 
-  int Jt808FramePack(const uint16_t &commond);
+  size_t Jt808FramePack(const uint16_t &commond);
   uint16_t Jt808FrameParse(void);
   int ReportPosition(void);
   void ReportUpgradeResult(void);
@@ -54,7 +54,7 @@ class Jt808Terminal {
   // Position status accessors/mutators.
   int positon_status(void) const { return position_status_.item_value[0]; }
   void set_position_status(const int &value) {
-     position_status_.item_value[0] = value;
+     position_status_.item_value[0] = static_cast<uint8_t>(value);
   }
 
   // Jt808 info accessors/mutators.
@@ -99,7 +99,7 @@ class Jt808Terminal {
   // gnss satellites num accessors/mutators.
   int gnss_satellite_num(void) const { return gnss_satellite_num_.item_value[0]; }
   void set_gnss_satellite_num(const int &value) {
-     gnss_satellite_num_.item_value[0] = value;
+     gnss_satellite_num_.item_value[0] = static_cast<uint8_t>(value);
   }
 
   // return current report interval.
@@ -137,25 +137,25 @@ class Jt808Terminal {
 
   bool is_connect_ = false;
   int socket_fd_ = -1;
-  int message_flow_number_ = {0};
-  int parameter_set_type_ = {0};
+  uint16_t message_flow_number_ = 0;
+  int parameter_set_type_ = 0;
   int terminal_control_type_ = 0;
   int report_interval_ = -1;
   int64_t report_valid_time_ = -1;
   AlarmBit alarm_bit_;
   StatusBit status_bit_;
-  PositionInfo position_info_ = {0};
-  Jt808Info jt808_info_ = {{0}};
-  UpgradeInfo upgrade_info_ = {{0}};
-  AuthenticationCode authentication_code_ = {{0}};
+  PositionInfo position_info_;
+  Jt808Info jt808_info_;
+  UpgradeInfo upgrade_info_;
+  AuthenticationCode authentication_code_;
   Message message_;
-  PositionExtension custom_item_len_ = {0};
-  PositionExtension position_status_ = {0};
-  PositionExtension gnss_satellite_num_ = {0};
+  PositionExtension custom_item_len_;
+  PositionExtension position_status_;
+  PositionExtension gnss_satellite_num_;
   ProtocolParameters pro_para_;
   PassThrough pass_through_;
   CanBusDataTimestamp can_bus_data_timestamp_;
-  AreaRouteSet area_route_set_ = {0};
+  AreaRouteSet area_route_set_;
   std::vector<CanBusData> *can_bus_data_list_ = nullptr;
   std::map<uint32_t, std::string> terminal_parameter_map_;
 };

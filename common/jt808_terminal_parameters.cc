@@ -35,7 +35,7 @@ uint8_t GetParameterTypeByParameterId(const uint32_t &para_id) {
   }
 }
 
-uint8_t GetParameterLengthByParameterType(const uint8_t &para_type) {
+uint16_t GetParameterLengthByParameterType(const uint8_t &para_type) {
   switch (para_type) {
     case kByteType:
       return 1;

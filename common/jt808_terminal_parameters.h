@@ -228,16 +228,8 @@ enum ParametersType {
   kStringType,
 };
 
-// 终端参数
-struct TerminalParameter {
-  uint8_t parameter_len;
-  uint8_t parameter_type;
-  uint32_t parameter_id;
-  uint8_t parameter_value[256];
-};
-
 uint8_t GetParameterTypeByParameterId(const uint32_t &para_id);
-uint8_t GetParameterLengthByParameterType(const uint8_t &para_type);
+uint16_t GetParameterLengthByParameterType(const uint8_t &para_type);
 
 
 #endif // JT808_COMMON_JT808_TERMINAL_PARAMETERS_H_

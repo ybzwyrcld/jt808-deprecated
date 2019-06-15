@@ -28,7 +28,6 @@ struct ProtocolParameters {
   VehicleControlFlag vehicle_control_flag;
   std::map<uint16_t, Message> *packet_map;
   std::list<uint16_t> *packet_id_list;
-  std::list<TerminalParameter *> *terminal_parameter_list;
   std::vector<uint32_t> *terminal_parameter_id_list;
 };
 

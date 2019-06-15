@@ -66,7 +66,8 @@ int Jt808Terminal::Init() {
   area_route_set_.route_list = new std::list<Route *>;
   ReadAreaRouteFormFile(kAreaRouteFlie, area_route_set_);
   WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
-
+  memset(&position_info_, 0x0, sizeof (position_info_));
+  memset(&authentication_code_, 0x0, sizeof (authentication_code_));
   return 0;
 }
 
@@ -76,7 +77,7 @@ int Jt808Terminal::RequestConnectServer(void) {
   struct sockaddr_in addr;
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
-  addr.sin_port = htons(jt808_info_.server_port);
+  addr.sin_port = htons(static_cast<uint16_t>(jt808_info_.server_port));
   addr.sin_addr.s_addr = inet_addr(jt808_info_.server_ip);
 
   socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -235,7 +236,7 @@ int Jt808Terminal::RecvFrameData(void) {
   return retval;
 }
 
-int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
+size_t Jt808Terminal::Jt808FramePack(const uint16_t &command) {
   MessageHead *msghead_ptr;
   PositionBasicInfo *pbi_ptr;
   RegisterInfo *reg_ptr;
@@ -311,7 +312,8 @@ int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
       u16val = EndianSwap16(pro_para_.respond_flow_num);
       memcpy(msg_body, &u16val, 2);
       msg_body += 2;
-      *msg_body++ = pro_para_.terminal_parameter_id_list->size();
+      *msg_body++ = static_cast<uint8_t>(
+                        pro_para_.terminal_parameter_id_list->size());
       message_.size += 3;
       msghead_ptr->attribute.bit.msglen += 3;
       for (auto &parameter_id : *pro_para_.terminal_parameter_id_list) {
@@ -322,12 +324,12 @@ int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
         switch (GetParameterTypeByParameterId(parameter_id)) {
           case kByteType:
             *msg_body++ = 1;
-            *msg_body++ = atoi(parameter_value.c_str());
+            *msg_body++ = static_cast<uint8_t>(atoi(parameter_value.c_str()));
             u8val = 2;
             break;
           case kWordType:
             *msg_body++ = 2;
-            u16val = atoi(parameter_value.c_str());
+            u16val = static_cast<uint16_t>(atoi(parameter_value.c_str()));
             u16val = EndianSwap16(u16val);
             memcpy(msg_body, &u16val, 2);
             msg_body += 2;
@@ -335,17 +337,20 @@ int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
             break;
           case kDwordType:
             *msg_body++ = 4;
-            u32val = atoi(parameter_value.c_str());
+            u32val = static_cast<uint32_t>(atoi(parameter_value.c_str()));
             u32val = EndianSwap32(u32val);
             memcpy(msg_body, &u32val, 4);
             msg_body += 4;
             u8val = 5;
             break;
           case kStringType:
-            *msg_body++ = parameter_value.size();
+            *msg_body++ = static_cast<uint8_t>(parameter_value.size());
             memcpy(msg_body, parameter_value.c_str(), parameter_value.size());
             msg_body += parameter_value.size();
-            u8val = 1 + parameter_value.size();
+            u8val = static_cast<uint8_t>(1 + parameter_value.size());
+            break;
+          default:
+            u8val = 0;
             break;
         }
         message_.size += 4 + u8val;
@@ -371,9 +376,9 @@ int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
       pbi_ptr = reinterpret_cast<PositionBasicInfo *>(&msg_body[0]);
       pbi_ptr->alarm.value = EndianSwap32(alarm_bit_.value);
       pbi_ptr->status.value = EndianSwap32(status_bit_.value);
-      u32val = position_info_.latitude * 1000000UL;
+      u32val = static_cast<uint32_t>(position_info_.latitude * 1000000UL);
       pbi_ptr->latitude = EndianSwap32(u32val);
-      u32val = position_info_.longitude * 1000000UL;
+      u32val = static_cast<uint32_t>(position_info_.longitude * 1000000UL);
       pbi_ptr->longitude = EndianSwap32(u32val);
       u16val = static_cast<uint16_t>(position_info_.altitude);
       pbi_ptr->atitude = EndianSwap16(u16val);
@@ -406,7 +411,7 @@ int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
       }
       break;
     case UP_CANBUSDATAUPLOAD:
-      *msg_body++ = can_bus_data_list_->size();
+      *msg_body++ = static_cast<uint8_t>(can_bus_data_list_->size());
       *msg_body++ = BcdFromHex(can_bus_data_timestamp_.hour);
       *msg_body++ = BcdFromHex(can_bus_data_timestamp_.minute);
       *msg_body++ = BcdFromHex(can_bus_data_timestamp_.second);
@@ -437,7 +442,7 @@ int Jt808Terminal::Jt808FramePack(const uint16_t &command) {
       u16val = EndianSwap16(pro_para_.packet_first_flow_num);
       memcpy(msg_body, &u16val, 2);
       msg_body += 2;
-      *msg_body = pro_para_.packet_id_list->size();
+      *msg_body = static_cast<uint8_t>(pro_para_.packet_id_list->size());
       msg_body++;
       for (auto &packet_id : *pro_para_.packet_id_list) {
         u16val = EndianSwap16(packet_id);
@@ -479,7 +484,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
   std::ofstream ofs;
   std::vector<uint32_t> terminal_parameter_id_list;
   MessageHead *msghead_ptr;
-  MessageBodyAttr msgbody_attribute = {0};
+  MessageBodyAttr msgbody_attribute;
 
   // printf("%s[%d]: socket-recv[%lu]:\n",
   //        __FUNCTION__, __LINE__, message_.size);
@@ -645,10 +650,11 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
     case DOWN_GETTERMPARA:
     case DOWN_GETSPECTERMPARA:
       uint16_t data_len;
-      int parameter_type;
-      int respond_flow_num;
+      uint8_t parameter_type;
+      uint16_t respond_flow_num;
       if (message_id == DOWN_GETTERMPARA) {  // Get all terminal parameter.
-        pro_para_.respond_para_num = terminal_parameter_map_.size();
+        pro_para_.respond_para_num = static_cast<uint8_t>(
+                                         terminal_parameter_map_.size());
         for (auto &parameter : terminal_parameter_map_) {
           terminal_parameter_id_list.push_back(parameter.first);
         }
@@ -1343,6 +1349,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
       memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
       Jt808FramePack(UP_UNIRESPONSE);
       SendFrameData();
+      break;
     default:
       break;
   }

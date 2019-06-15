@@ -22,7 +22,7 @@ struct DeviceNode {
 
 int EpollRegister(const int &epoll_fd, const int &fd);
 int EpollUnregister(const int &epoll_fd, const int &fd);
-void ReadDevicesList(const char *path, std::list<DeviceNode> &list);
+bool ReadDevicesList(const char *path, std::list<DeviceNode> &list);
 int SearchStringInList(const std::vector<std::string> &va_vec,
                        const std::string &str);
 

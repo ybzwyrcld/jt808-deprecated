@@ -37,16 +37,16 @@ int EpollUnregister(const int &epoll_fd, const int &fd) {
   int ret;
 
   do {
-    ret = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+    ret = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
   } while (ret < 0 && errno == EINTR);
 
   return ret;
 }
 
-void ReadDevicesList(const char *path, std::list<DeviceNode> &list) {
+bool ReadDevicesList(const char *path, std::list<DeviceNode> &list) {
   char *result;
   char line[128] = {0};
-  char flags = ';';
+  const char *flags = ";\0";
   uint32_t u32val;
   std::ifstream ifs;
 
@@ -54,13 +54,14 @@ void ReadDevicesList(const char *path, std::list<DeviceNode> &list) {
   if (ifs.is_open()) {
     std::string str;
     while (getline(ifs, str)) {
-      DeviceNode node = {0};
+      DeviceNode node;
+      memset(&node, 0x0, sizeof (node));
       memset(line, 0x0, sizeof(line));
       str.copy(line, str.length(), 0);
-      result = strtok(line, &flags);
+      result = strtok(line, flags);
       str = result;
       str.copy(node.phone_num, str.size(), 0);
-      result = strtok(NULL, &flags);
+      result = strtok(nullptr, flags);
       str = result;
       u32val = 0;
       sscanf(str.c_str(), "%u", &u32val);
@@ -69,7 +70,9 @@ void ReadDevicesList(const char *path, std::list<DeviceNode> &list) {
       list.push_back(node);
     }
     ifs.close();
+    if (!list.empty()) return true;
   }
+  return false;
 }
 
 int SearchStringInList(const std::vector<std::string> &va_vec,

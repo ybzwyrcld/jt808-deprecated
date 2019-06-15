@@ -13,17 +13,17 @@
 #include "common/jt808_protocol.h"
 
 
-uint8_t BccCheckSum(const uint8_t *src, const int &len) {
+uint8_t BccCheckSum(const uint8_t *src, const size_t &len) {
   uint8_t checksum = 0;
-  for (int i = 0; i < len; ++i) {
+  for (size_t i = 0; i < len; ++i) {
     checksum = checksum ^ src[i];
   }
   return checksum;
 }
 
-uint16_t Escape(uint8_t *src, const int &len) {
-  uint16_t i;
-  uint16_t j;
+size_t Escape(uint8_t *src, const size_t &len) {
+  size_t i;
+  size_t j;
   uint8_t *buffer = new uint8_t[len * 2];
 
   memset(buffer, 0x0, len * 2);
@@ -44,9 +44,9 @@ uint16_t Escape(uint8_t *src, const int &len) {
   return j;
 }
 
-uint16_t ReverseEscape(uint8_t *src, const int &len) {
-  uint16_t i;
-  uint16_t j;
+size_t ReverseEscape(uint8_t *src, const size_t &len) {
+  size_t i;
+  size_t j;
   uint8_t *buffer = new uint8_t[len];
 
   memset(buffer, 0x0, len);

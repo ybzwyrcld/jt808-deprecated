@@ -21,11 +21,11 @@ class Jt808Service {
   virtual ~Jt808Service();
 
   // Init service.
-  bool Init(const int &port, const int &max_count);
-  bool Init(const char *ip, const int &port, const int &max_count);
+  bool Init(const uint16_t &port, const int &max_count);
+  bool Init(const char *ip, const uint16_t &port, const int &max_count);
   int AcceptNewClient(void);
 
-  // accept when command client connect.
+  // Accept when command client connect.
   int AcceptNewCommandClient(void) {
     memset(&uid_, 0x0, sizeof(uid_));
     client_fd_ = ServerAccept(socket_fd_, &uid_);
@@ -41,7 +41,7 @@ class Jt808Service {
   int SendFrameData(const int &fd, const Message &msg);
   int RecvFrameData(const int &fd, Message &msg);
 
-  int Jt808FramePack(Message &msg, const uint16_t &command,
+  size_t Jt808FramePack(Message &msg, const uint16_t &command,
                      const ProtocolParameters &propara);
 
   uint16_t Jt808FrameParse(Message &msg, ProtocolParameters &propara);
@@ -86,7 +86,7 @@ class Jt808Service {
   int listen_sock_ = -1;
   int epoll_fd_ = -1;
   int max_count_ = 0;
-  int message_flow_num_ = 0;
+  uint16_t message_flow_num_ = 0;
   int socket_fd_ = -1;
   int client_fd_ = -1;
   uid_t uid_;

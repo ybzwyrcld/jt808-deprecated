@@ -6,7 +6,8 @@
 #include "service/jt808_util.h"
 
 
-void ParsePositionReport(const uint8_t *buffer, const int &len, const int &offset) {
+void ParsePositionReport(const uint8_t *buffer,
+                         const size_t &len, const size_t &offset) {
   uint16_t u16val;
   uint32_t u32val;
   double latitude;
@@ -14,9 +15,9 @@ void ParsePositionReport(const uint8_t *buffer, const int &len, const int &offse
   float altitude;
   float speed;
   float bearing;
-  AlarmBit alarm_bit = {0};
-  StatusBit status_bit = {0};
-  char timestamp[6];
+  AlarmBit alarm_bit;
+  StatusBit status_bit;
+  unsigned char timestamp[6] = {0};
   char phone_num[6] = {0};
   char device_num[12] = {0};
 
@@ -31,11 +32,11 @@ void ParsePositionReport(const uint8_t *buffer, const int &len, const int &offse
   memcpy(&u32val, &buffer[25+offset], 4);
   longitude = EndianSwap32(u32val) / 1000000.0;
   memcpy(&u16val, &buffer[29+offset], 2);
-  altitude = EndianSwap16(u16val);
+  altitude = static_cast<float>(EndianSwap16(u16val));
   memcpy(&u16val, &buffer[31+offset], 2);
-  speed = EndianSwap16(u16val) * 10.0;
+  speed = static_cast<float>(EndianSwap16(u16val) * 10.0);
   memcpy(&u16val, &buffer[33+offset], 2);
-  bearing = EndianSwap16(u16val);
+  bearing = static_cast<float>(EndianSwap16(u16val));
   timestamp[0] = HexFromBcd(buffer[35+offset]);
   timestamp[1] = HexFromBcd(buffer[36+offset]);
   timestamp[2] = HexFromBcd(buffer[37+offset]);
@@ -48,12 +49,11 @@ void ParsePositionReport(const uint8_t *buffer, const int &len, const int &offse
                   "\tlatitude: %lf%c\n"
                   "\taltitude: %f\n"
                   "\tspeed: %f\n""\tbearing: %f\n"
-                  "\ttimestamp: 20%02d-%02d-%02d, %02d:%02d:%02d\n",
+                  "\ttimestamp: %02d-%02d-%02d, %02d:%02d:%02d\n",
           device_num, alarm_bit.value, status_bit.value,
           longitude, status_bit.bit.ewlongitude == 0 ? 'E':'W',
           latitude, status_bit.bit.snlatitude == 0 ? 'N':'S',
-          altitude,
-          speed, bearing,
+          altitude, speed, bearing,
           timestamp[0], timestamp[1], timestamp[2],
           timestamp[3], timestamp[4], timestamp[5]);
   if (len >= (46+offset)) {
