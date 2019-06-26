@@ -2,6 +2,10 @@ add_library(jt808_area_route STATIC
   jt808_area_route.cc
 )
 
+target_link_libraries(jt808_area_route PRIVATE
+  common_jt808_util
+)
+
 add_library(terminal_terminal_parameter STATIC
   jt808_terminal_parameters.cc
 )

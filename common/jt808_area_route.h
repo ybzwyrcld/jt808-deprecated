@@ -1,3 +1,17 @@
+// Copyright 2019 Yuming Meng. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #ifndef JT808_COMMON_JT808_AREA_ROUTE_H_
 #define JT808_COMMON_JT808_AREA_ROUTE_H_
 
@@ -91,7 +105,7 @@ struct CircularArea {
   uint32_t area_id;  // 区域ID
   AreaAttribute area_attribute;  // 区域属性
   Coordinate center_point;  // 中心点坐标
-  uint32_t radius; // 半径
+  uint32_t radius;  // 半径
   uint8_t start_time[6];  // 起始时间
   uint8_t end_time[6];  // 结束时间
   uint16_t max_speed;  // 最高速度
@@ -115,7 +129,7 @@ struct PolygonalArea {
   uint8_t start_time[6];  // 起始时间
   uint8_t end_time[6];  // 结束时间
   uint16_t max_speed;  // 最高速度
-  uint8_t overspeed_duration; // 超速持续时间
+  uint8_t overspeed_duration;  // 超速持续时间
   uint16_t coordinate_count;  // 坐标总数
   std::vector<Coordinate *> *coordinate_list;  // 坐标列表
 };
@@ -131,4 +145,4 @@ struct Route {
 
 #pragma pack(pop)
 
-#endif // JT808_COMMON_JT808_AREA_ROUTE_H_
+#endif  // JT808_COMMON_JT808_AREA_ROUTE_H_

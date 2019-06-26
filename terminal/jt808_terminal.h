@@ -1,3 +1,17 @@
+// Copyright 2019 Yuming Meng. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #ifndef JT808_TERMINAL_JT808_TERMINAL_H_
 #define JT808_TERMINAL_JT808_TERMINAL_H_
 
@@ -44,6 +58,7 @@ class Jt808Terminal {
   uint16_t Jt808FrameParse(void);
   int ReportPosition(void);
   void ReportUpgradeResult(void);
+  void SendCommonResponse(void);
 
   // Alarm bit accessors/mutators.
   AlarmBit alarm_bit(void) const { return alarm_bit_; }
@@ -97,7 +112,9 @@ class Jt808Terminal {
   }
 
   // gnss satellites num accessors/mutators.
-  int gnss_satellite_num(void) const { return gnss_satellite_num_.item_value[0]; }
+  int gnss_satellite_num(void) const {
+    return gnss_satellite_num_.item_value[0];
+  }
   void set_gnss_satellite_num(const int &value) {
      gnss_satellite_num_.item_value[0] = static_cast<uint8_t>(value);
   }
@@ -160,4 +177,4 @@ class Jt808Terminal {
   std::map<uint32_t, std::string> terminal_parameter_map_;
 };
 
-#endif // JT808_TERMINAL_JT808_TERMINAL_H_
+#endif  // JT808_TERMINAL_JT808_TERMINAL_H_

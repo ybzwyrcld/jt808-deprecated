@@ -1,7 +1,23 @@
+// Copyright 2019 Yuming Meng. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "bcd/bcd.h"
 
+#include <stdint.h>
 
-unsigned char BcdFromHex(const unsigned char &src) {
+
+unsigned char BcdFromHex(const uint8_t &src) {
   unsigned char temp;
 
   temp = ((src / 10) << 4) + (src % 10);
@@ -9,7 +25,7 @@ unsigned char BcdFromHex(const unsigned char &src) {
   return temp;
 }
 
-unsigned char HexFromBcd(const unsigned char &src) {
+unsigned char HexFromBcd(const uint8_t &src) {
   unsigned char temp;
 
   temp = (src >> 4)*10 + (src & 0x0f);
@@ -20,7 +36,7 @@ char *BcdFromStringCompress(const char *src, char *dst, const size_t &srclen) {
   char *ptr = dst;
   unsigned char temp;
 
-  if (srclen % 2 != 0 ) {
+  if (srclen % 2 != 0) {
     *ptr++ = BcdFromHex(*src++ - '0');
   }
 

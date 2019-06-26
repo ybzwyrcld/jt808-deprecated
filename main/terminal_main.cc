@@ -1,3 +1,17 @@
+// Copyright 2019 Yuming Meng. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include <sys/time.h>
 
 #include <stdint.h>
@@ -19,7 +33,6 @@ uint64_t inline CalculatingTimeMs(const struct timeval &time_begin,
 // static void DelayInMs(const uint64_t &millisecond) {
 //   struct timeval time_begin;
 //   struct timeval time_end;
-// 
 //   gettimeofday(&time_begin, NULL);
 //   do {
 //     gettimeofday(&time_end, NULL);
@@ -64,7 +77,7 @@ int main(int argc, char *argv[]) {
       if ((retval = my_terminal.RecvFrameData()) > 0) {
         my_terminal.Jt808FrameParse();
       } else if (retval < 0) {
-        break;;
+        break;
       }
       if ((report_interval < 0) && (my_terminal.report_interval() > 0)) {
         report_interval = my_terminal.report_interval();
@@ -72,7 +85,7 @@ int main(int argc, char *argv[]) {
       gettimeofday(&time_end, NULL);
     } while (CalculatingTimeMs(time_begin, time_end) < 1000);
     if (retval < 0) {
-      break;;
+      break;
     }
   }
 

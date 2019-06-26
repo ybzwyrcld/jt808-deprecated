@@ -1,3 +1,17 @@
+// Copyright 2019 Yuming Meng. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "unix_socket/unix_socket.h"
 
 #include <stdio.h>
@@ -33,7 +47,7 @@ int ServerListen(const char *name) {
   // fill in socket address structure.
   memset(&sock_un, 0, sizeof(sock_un));
   sock_un.sun_family = AF_UNIX;
-  strcpy(sock_un.sun_path, name);
+  snprintf(sock_un.sun_path, sizeof (sock_un.sun_path), "%s", name);
   len = offsetof(struct sockaddr_un, sun_path) + strlen(name);
 
   // bind the name to the descriptor.
@@ -43,7 +57,7 @@ int ServerListen(const char *name) {
   }
 
   // add all user write permission.
-  snprintf(cmd, 128, "chmod a+w %s", name);
+  snprintf(cmd, sizeof (cmd), "chmod a+w %s", name);
   retval = system(cmd);
 
   // tell kernel we're a server.
@@ -75,8 +89,12 @@ int ServerAccept(const int &listenfd, uid_t *uidptr) {
   struct stat statbuf;
 
   len = sizeof(sock_un);
-  if ((clientfd = accept(listenfd, (struct sockaddr *)&sock_un, (socklen_t*)&len)) < 0)
-    return(-1);  // often errno=EINTR, if signal caught.
+  if ((clientfd = accept(listenfd,
+                         reinterpret_cast<struct sockaddr *>(&sock_un),
+                         reinterpret_cast<socklen_t*>(&len))) < 0) {
+    return -1;
+  }
+  // often errno=EINTR, if signal caught.
 
   // obtain the client's uid from its calling address.
   // len of pathname.
@@ -132,16 +150,18 @@ int ClientConnect(const char *name) {
   struct sockaddr_un sock_un;
 
   // create a UNIX domain stream socket.
-  if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
-    return(-1);
+  if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+    return -1;
+  }
 
   memset(&sock_un, 0, sizeof(sock_un));
   sock_un.sun_family = AF_UNIX;
-  sprintf(sock_un.sun_path, "%s%05d", CLI_PATH, getpid());
+  snprintf(sock_un.sun_path, sizeof (sock_un.sun_path), "%s%05d",
+           CLI_PATH, getpid());
   len = offsetof(struct sockaddr_un, sun_path) + strlen(sock_un.sun_path);
 
   unlink(sock_un.sun_path);  // in case it already exits.
-  if (bind(fd, (struct sockaddr *)&sock_un, len) < 0) {
+  if (bind(fd, reinterpret_cast<struct sockaddr *>(&sock_un), len) < 0) {
     retval = -2;
     goto errout;
   }
@@ -154,10 +174,10 @@ int ClientConnect(const char *name) {
   // fill socket address structure with server's address.
   memset(&sock_un, 0, sizeof(sock_un));
   sock_un.sun_family = AF_UNIX;
-  strcpy(sock_un.sun_path, name);
+  snprintf(sock_un.sun_path, sizeof (sock_un.sun_path), "%s", name);
   len = offsetof(struct sockaddr_un, sun_path) + strlen(name);
 
-  if (connect(fd, (struct sockaddr *)&sock_un, len) < 0) {
+  if (connect(fd, reinterpret_cast<struct sockaddr *>(&sock_un), len) < 0) {
     retval = -4;
     goto errout;
   }

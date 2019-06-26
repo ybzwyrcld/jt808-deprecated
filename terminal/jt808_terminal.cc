@@ -1,3 +1,17 @@
+// Copyright 2019 Yuming Meng. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "terminal/jt808_terminal.h"
 
 #include <sys/types.h>
@@ -18,6 +32,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <utility>
 
 #include "common/jt808_util.h"
 #include "terminal/jt808_terminal_parameters.h"
@@ -28,7 +43,7 @@
 Jt808Terminal::~Jt808Terminal() {
   terminal_parameter_map_.clear();
   ClearConnect();
-  ClearAreaRouteListElement(area_route_set_);
+  ClearAreaRouteListElement(&area_route_set_);
   delete [] area_route_set_.circular_area_list;
   delete [] area_route_set_.rectangle_area_list;
   delete [] area_route_set_.polygonal_area_list;
@@ -42,7 +57,7 @@ int Jt808Terminal::Init() {
   pro_para_.packet_id_list = nullptr;
   pro_para_.terminal_parameter_id_list = nullptr;
   if (ReadTerminalParameterFormFile(kTerminalParametersFlie,
-                                    terminal_parameter_map_) < 0) {
+                                    &terminal_parameter_map_) < 0) {
     return -1;
   }
 
@@ -64,7 +79,7 @@ int Jt808Terminal::Init() {
   area_route_set_.rectangle_area_list = new std::list<RectangleArea *>;
   area_route_set_.polygonal_area_list = new std::list<PolygonalArea *>;
   area_route_set_.route_list = new std::list<Route *>;
-  ReadAreaRouteFormFile(kAreaRouteFlie, area_route_set_);
+  ReadAreaRouteFormFile(kAreaRouteFlie, &area_route_set_);
   WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
   memset(&position_info_, 0x0, sizeof (position_info_));
   memset(&authentication_code_, 0x0, sizeof (authentication_code_));
@@ -100,7 +115,6 @@ int Jt808Terminal::RequestConnectServer(void) {
 
   socket_fd_ = socket_fd;
   return 0;
-
 }
 
 int Jt808Terminal::RequestLoginServer(void) {
@@ -184,9 +198,8 @@ void Jt808Terminal::ClearConnect(void) {
   if (socket_fd_ > 0) {
     close(socket_fd_);
   }
-
-  is_connect_ = false;
   socket_fd_ = -1;
+  is_connect_ = false;
 }
 
 int Jt808Terminal::SendFrameData(void) {
@@ -225,7 +238,7 @@ int Jt808Terminal::RecvFrameData(void) {
       printf("%s[%d]: recv data failed!!!\n", __FUNCTION__, __LINE__);
     }
     message_.size = 0;
-  } else if(retval == 0) {
+  } else if (retval == 0) {
     retval = -1;
     message_.size = 0;
     printf("%s[%d]: connection disconect!!!\n", __FUNCTION__, __LINE__);
@@ -475,8 +488,6 @@ size_t Jt808Terminal::Jt808FramePack(const uint16_t &command) {
 
 uint16_t Jt808Terminal::Jt808FrameParse() {
   uint8_t *msg_body;
-  uint8_t count;
-  uint8_t operation;
   uint8_t u8val;
   uint16_t u16val;
   uint16_t message_id;
@@ -492,8 +503,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
   //   printf("%02X ", message_.buffer[i]);
   // printf("\n");
 
-  message_.size = ReverseEscape(&message_.buffer[1],
-                                    message_.size);
+  message_.size = ReverseEscape(&message_.buffer[1], message_.size);
   msghead_ptr = reinterpret_cast<MessageHead *>(&message_.buffer[1]);
   memcpy(&msgbody_attribute.value, &msghead_ptr->attribute.value, 2);
   msgbody_attribute.value = EndianSwap16(msgbody_attribute.value);
@@ -512,7 +522,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
     case DOWN_UNIRESPONSE:
       memcpy(&u16val, &msg_body[2], 2);
       pro_para_.respond_id = EndianSwap16(u16val);
-      switch(pro_para_.respond_id) {
+      switch (pro_para_.respond_id) {
         case UP_HEARTBEAT:
           printf("%s[%d]: received heartbeat respond: ",
                  __FUNCTION__, __LINE__);
@@ -553,13 +563,13 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
       if (msg_body[4] == 0x00) {
         pro_para_.respond_result = kSuccess;
         printf("normal\r\n");
-      } else if(msg_body[4] == 0x01) {
+      } else if (msg_body[4] == 0x01) {
         pro_para_.respond_result = kFailure;
         printf("failed\r\n");
-      } else if(msg_body[4] == 0x02) {
+      } else if (msg_body[4] == 0x02) {
         pro_para_.respond_result = kMessageHasWrong;
         printf("message has something wrong\r\n");
-      } else if(msg_body[4] == 0x03) {
+      } else if (msg_body[4] == 0x03) {
         pro_para_.respond_result = kNotSupport;
         printf("message not support\r\n");
       }
@@ -577,16 +587,16 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
           printf(" %02X", authentication_code_.buffer[i]);
         }
         printf("\n");
-      } else if(msg_body[2] == 0x01) {
+      } else if (msg_body[2] == 0x01) {
         pro_para_.respond_result = kVehiclesHaveBeenRegistered;
         printf("vehicle has been registered\r\n");
-      } else if(msg_body[2] == 0x02) {
+      } else if (msg_body[2] == 0x02) {
         pro_para_.respond_result = kNoSuchVehicleInTheDatabase;
         printf("no such vehicle in the database\r\n");
-      } else if(msg_body[2] == 0x03) {
+      } else if (msg_body[2] == 0x03) {
         pro_para_.respond_result = kTerminalHaveBeenRegistered;
         printf("terminal has been registered\r\n");
-      } else if(msg_body[2] == 0x04) {
+      } else if (msg_body[2] == 0x04) {
         pro_para_.respond_result = kNoSuchTerminalInTheDatabase;
         printf("no such terminal in the database\r\n");
       }
@@ -606,35 +616,9 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
         msg_body += 4;
         u8val = msg_body[0];  // terminal parameter len.
         msg_body++;
-        for (auto &parameter : terminal_parameter_map_) {
-          if (parameter.first == u32val) {
-            switch (GetParameterTypeByParameterId(u32val)) {
-              case kByteType:
-                u8val = *msg_body;
-                parameter.second = std::to_string(u8val);
-                break;
-              case kWordType:
-                memcpy(&u16val, &msg_body[0], 2);
-                u16val = EndianSwap16(u16val);
-                parameter.second = std::to_string(u16val);
-                break;
-              case kDwordType:
-                memcpy(&u32val, &msg_body[0], 4);
-                u32val = EndianSwap32(u32val);
-                parameter.second = std::to_string(u32val);
-                break;
-              case kStringType:
-                memset(value, 0x0, 256);
-                memcpy(value, &msg_body[0], u8val);
-                parameter.second = value;
-                break;
-              default:
-                printf("unknow type\n");
-                break;
-            }
-            break;
-          }
-        }
+        memset(value, 0x0, sizeof (value));
+        memcpy(value, msg_body, u8val);
+        SetTerminalParameterValue(u32val, value, &terminal_parameter_map_);
         msg_body += u8val;
       }
 
@@ -643,9 +627,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
         WriteTerminalParameterToFile(kTerminalParametersFlie,
                                      terminal_parameter_map_);
       }
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     case DOWN_GETTERMPARA:
     case DOWN_GETSPECTERMPARA:
@@ -663,10 +645,8 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
         if (PrepareTerminalParameterIdList(&msg_body[1], msg_body[0],
                                            terminal_parameter_map_,
                                            &terminal_parameter_id_list) < 0) {
-          memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
           pro_para_.respond_result = kNotSupport;
-          Jt808FramePack(UP_UNIRESPONSE);
-          SendFrameData();
+          SendCommonResponse();
           return message_id;
         }
       }
@@ -735,9 +715,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
     case DOWN_TERMINALCONTROL:
       terminal_control_type_ = *msg_body++;
       pro_para_.respond_result = 0;
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     case DOWN_UPGRADEPACKAGE:
       uint8_t *packet_ptr;
@@ -767,9 +745,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
                message_.buffer[message_.size-2],
                BccCheckSum(&message_.buffer[1], message_.size-3));
         pro_para_.packet_id_list->push_back(packet_seq);
-        memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-        Jt808FramePack(UP_UNIRESPONSE);
-        SendFrameData();
+        SendCommonResponse();
         break;
       } else {
         if (pro_para_.packet_total_num) {
@@ -778,9 +754,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
           pro_para_.packet_map->insert(std::make_pair(1, message_));
         }
         pro_para_.respond_result = kSuccess;
-        memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-        Jt808FramePack(UP_UNIRESPONSE);
-        SendFrameData();
+        SendCommonResponse();
       }
       if (!pro_para_.packet_id_list->empty()) {
         packet_total = pro_para_.packet_id_list->back();
@@ -842,11 +816,9 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
                      "%s/%s-Ver%s.bin", kDownloadDir, "GPS",
                      msg_body[6] > 0 ? upgrade_info_.version_id : "20180922");
             break;
-          default: // Unknow type id, return not support msessage.
+          default:  // Unknow type id, return not support msessage.
             pro_para_.respond_result = kNotSupport;
-            memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-            Jt808FramePack(UP_UNIRESPONSE);
-            SendFrameData();
+            SendCommonResponse();
             return message_id;
         }
         // In case it already exists.
@@ -909,9 +881,6 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
       report_valid_time_ = static_cast<int64_t>(u32val);
       msg_body += 4;
       pro_para_.respond_result = 0;
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
       break;
     case DOWN_VEHICLECONTROL:
       pro_para_.vehicle_control_flag.value = *msg_body++;
@@ -921,423 +890,84 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
       SendFrameData();
       break;
     case DOWN_SETCIRCULARAREA:
-      operation = *msg_body++;
-      count = *msg_body++;
-      for (int i = 0; i < count; ++i) {
-        CircularArea *circular_area = new CircularArea;
-        memcpy(&u32val, msg_body, 4);
-        circular_area->area_id = EndianSwap32(u32val);
-        msg_body += 4;
-        memcpy(&u16val, msg_body, 2);
-        circular_area->area_attribute.value = EndianSwap16(u16val);
-        msg_body += 2;
-        memcpy(&u32val, msg_body, 4);
-        circular_area->center_point.latitude = EndianSwap32(u32val);
-        msg_body += 4;
-        memcpy(&u32val, msg_body, 4);
-        circular_area->center_point.longitude = EndianSwap32(u32val);
-        msg_body += 4;
-        memcpy(&u32val, msg_body, 4);
-        circular_area->radius = EndianSwap32(u32val);
-        msg_body += 4;
-        if (circular_area->area_attribute.bit.bytime) {
-          memcpy(circular_area->start_time, msg_body, 6);
-          msg_body += 6;
-          memcpy(circular_area->end_time, msg_body, 6);
-          msg_body += 6;
-        }
-        if (circular_area->area_attribute.bit.speedlimit) {
-          memcpy(&u16val, msg_body, 2);
-          circular_area->max_speed = EndianSwap16(u16val);
-          msg_body += 2;
-          circular_area->overspeed_duration = *msg_body++;
-        }
-        if (area_route_set_.circular_area_list == nullptr) {
-          area_route_set_.circular_area_list = new std::list<CircularArea *>;
-        }
-        if (operation == kAppendArea) {
-          area_route_set_.circular_area_list->push_back(circular_area);
-        } else {
-          auto area_it = area_route_set_.circular_area_list->begin();
-          while (area_it != area_route_set_.circular_area_list->end()) {
-            if ((*area_it)->area_id == circular_area->area_id) {
-              delete *area_it;
-              area_route_set_.circular_area_list->erase(area_it);
-              area_route_set_.circular_area_list->push_back(circular_area);
-              break;
-            } else {
-              ++area_it;
-            }
-          }
-        }
-      }
-      if (count > 0) {
+      if (DealSetCircularAreaRequest(msg_body, &area_route_set_) == 0) {
         WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
         pro_para_.respond_result = kSuccess;
       } else {
         pro_para_.respond_result = kFailure;
       }
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     case DOWN_DELCIRCULARAREA:
-      count = *msg_body++;
-      if (count == 0) {
-        ClearContainerElement(area_route_set_.circular_area_list);
-        pro_para_.respond_result = kSuccess;
-      } else if (area_route_set_.circular_area_list != nullptr) {
-        uint32_t area_id;
-        for (int i = 0; i < count; ++i) {
-          memcpy(&u32val, msg_body, 4);
-          area_id = EndianSwap32(u32val);
-          auto area_it = area_route_set_.circular_area_list->begin();
-          while (area_it != area_route_set_.circular_area_list->end()) {
-            if ((*area_it)->area_id == area_id) {
-              delete *area_it;
-              area_it = area_route_set_.circular_area_list->erase(area_it);
-              break;
-            } else {
-              ++area_it;
-            }
-          }
-        }
-        pro_para_.respond_result = kSuccess;
-      } else {
+      if ((area_route_set_.circular_area_list == nullptr) ||
+          (DeleteAreaRouteFromSet(msg_body, kCircular, &area_route_set_) < 0)) {
         pro_para_.respond_result = kFailure;
+      } else {
+        pro_para_.respond_result = kSuccess;
+        WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
       }
-      WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     case DOWN_SETRECTANGLEAREA:
-      operation = *msg_body++;
-      count = *msg_body++;
-      for (int i = 0; i < count; ++i) {
-        RectangleArea *rectangle_area = new RectangleArea;
-        memcpy(&u32val, msg_body, 4);
-        rectangle_area->area_id = EndianSwap32(u32val);
-        msg_body += 4;
-        memcpy(&u16val, msg_body, 2);
-        rectangle_area->area_attribute.value = EndianSwap16(u16val);
-        msg_body += 2;
-        memcpy(&u32val, msg_body, 4);
-        rectangle_area->upper_left_corner.latitude = EndianSwap32(u32val);
-        msg_body += 4;
-        memcpy(&u32val, msg_body, 4);
-        rectangle_area->upper_left_corner.longitude = EndianSwap32(u32val);
-        msg_body += 4;
-        memcpy(&u32val, msg_body, 4);
-        rectangle_area->bottom_right_corner.latitude = EndianSwap32(u32val);
-        msg_body += 4;
-        memcpy(&u32val, msg_body, 4);
-        rectangle_area->bottom_right_corner.longitude = EndianSwap32(u32val);
-        msg_body += 4;
-        if (rectangle_area->area_attribute.bit.bytime) {
-          memcpy(rectangle_area->start_time, msg_body, 6);
-          msg_body += 6;
-          memcpy(rectangle_area->end_time, msg_body, 6);
-          msg_body += 6;
-        }
-        if (rectangle_area->area_attribute.bit.speedlimit) {
-          memcpy(&u16val, msg_body, 2);
-          rectangle_area->max_speed = EndianSwap16(u16val);
-          msg_body += 2;
-          rectangle_area->overspeed_duration = *msg_body++;
-        }
-        if (area_route_set_.rectangle_area_list == nullptr) {
-          area_route_set_.rectangle_area_list = new std::list<RectangleArea *>;
-        }
-        if (operation == kAppendArea) {
-          area_route_set_.rectangle_area_list->push_back(rectangle_area);
-        } else {
-          auto area_it = area_route_set_.rectangle_area_list->begin();
-          while (area_it != area_route_set_.rectangle_area_list->end()) {
-            if ((*area_it)->area_id == rectangle_area->area_id) {
-              delete *area_it;
-              area_route_set_.rectangle_area_list->erase(area_it);
-              area_route_set_.rectangle_area_list->push_back(rectangle_area);
-              break;
-            } else {
-              ++area_it;
-            }
-          }
-        }
-      }
-      if (count > 0) {
+      if (DealSetRectangleAreaRequest(msg_body, &area_route_set_) == 0) {
         WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
         pro_para_.respond_result = kSuccess;
       } else {
         pro_para_.respond_result = kFailure;
       }
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     case DOWN_DELRECTANGLEAREA:
-      count = *msg_body++;
-      if (count == 0) {
-        ClearContainerElement(area_route_set_.rectangle_area_list);
-        pro_para_.respond_result = kSuccess;
-      } else if (area_route_set_.rectangle_area_list != nullptr) {
-        uint32_t area_id;
-        for (int i = 0; i < count; ++i) {
-          memcpy(&u32val, msg_body, 4);
-          area_id = EndianSwap32(u32val);
-          auto area_it = area_route_set_.rectangle_area_list->begin();
-          while (area_it != area_route_set_.rectangle_area_list->end()) {
-            if ((*area_it)->area_id == area_id) {
-              delete *area_it;
-              area_route_set_.rectangle_area_list->erase(area_it);
-              break;
-            } else {
-              ++area_it;
-            }
-          }
-        }
-        pro_para_.respond_result = kSuccess;
-      } else {
+      if ((area_route_set_.rectangle_area_list == nullptr) ||
+          (DeleteAreaRouteFromSet(msg_body, kRectangle,
+                                  &area_route_set_) < 0)) {
         pro_para_.respond_result = kFailure;
+      } else {
+        pro_para_.respond_result = kSuccess;
+        WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
       }
-      WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     case DOWN_SETPOLYGONALAREA:
-      operation = *msg_body++;
-      count = *msg_body++;
-      for (int i = 0; i < count; ++i) {
-        PolygonalArea *polygonal_area = new PolygonalArea;
-        memcpy(&u32val, msg_body, 4);
-        polygonal_area->area_id = EndianSwap32(u32val);
-        msg_body += 4;
-        memcpy(&u16val, msg_body, 2);
-        polygonal_area->area_attribute.value = EndianSwap16(u16val);
-        msg_body += 2;
-        if (polygonal_area->area_attribute.bit.bytime) {
-          memcpy(polygonal_area->start_time, msg_body, 6);
-          msg_body += 6;
-          memcpy(polygonal_area->end_time, msg_body, 6);
-          msg_body += 6;
-        }
-        if (polygonal_area->area_attribute.bit.speedlimit) {
-          memcpy(&u16val, msg_body, 2);
-          polygonal_area->max_speed = EndianSwap16(u16val);
-          msg_body += 2;
-          polygonal_area->overspeed_duration = *msg_body++;
-        }
-        memcpy(&u16val, msg_body, 2);
-        polygonal_area->coordinate_count = EndianSwap16(u16val);
-        msg_body += 2;
-        polygonal_area->coordinate_list = new std::vector<Coordinate*>;
-        for (int i = 0; i < polygonal_area->coordinate_count; ++i) {
-          Coordinate *coordinate = new Coordinate;
-          memcpy(&u32val, msg_body, 4);
-          coordinate->latitude = EndianSwap32(u32val);
-          msg_body += 4;
-          memcpy(&u32val, msg_body, 4);
-          coordinate->longitude = EndianSwap32(u32val);
-          msg_body += 4;
-          polygonal_area->coordinate_list->push_back(coordinate);
-        }
-        if (area_route_set_.polygonal_area_list == nullptr) {
-          area_route_set_.polygonal_area_list = new std::list<PolygonalArea *>;
-        }
-        if (operation == kAppendArea) {
-          area_route_set_.polygonal_area_list->push_back(polygonal_area);
-        } else {
-          auto area_it = area_route_set_.polygonal_area_list->begin();
-          while (area_it != area_route_set_.polygonal_area_list->end()) {
-            if ((*area_it)->area_id == polygonal_area->area_id) {
-              ClearContainerElement((*area_it)->coordinate_list);
-              delete (*area_it)->coordinate_list;
-              delete *area_it;
-              area_route_set_.polygonal_area_list->erase(area_it);
-              area_route_set_.polygonal_area_list->push_back(polygonal_area);
-              break;
-            } else {
-              ++area_it;
-            }
-          }
-        }
-      }
-      if (count > 0) {
+      if (DealSetPolygonalAreaRequest(msg_body, &area_route_set_) == 0) {
         WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
         pro_para_.respond_result = kSuccess;
       } else {
         pro_para_.respond_result = kFailure;
       }
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     case DOWN_DELPOLYGONALAREA:
-      count = *msg_body++;
-      if (count == 0) {
-        if (area_route_set_.polygonal_area_list != nullptr) {
-          auto area_it = area_route_set_.polygonal_area_list->begin();
-          while (area_it != area_route_set_.polygonal_area_list->end()) {
-            ClearContainerElement((*area_it)->coordinate_list);
-            delete (*area_it)->coordinate_list;
-            ++area_it;
-          }
-        }
-        ClearContainerElement(area_route_set_.polygonal_area_list);
-        pro_para_.respond_result = kSuccess;
-      } else if (area_route_set_.polygonal_area_list != nullptr) {
-        uint32_t area_id;
-        for (int i = 0; i < count; ++i) {
-          memcpy(&u32val, msg_body, 4);
-          area_id = EndianSwap32(u32val);
-          auto area_it = area_route_set_.polygonal_area_list->begin();
-          while (area_it != area_route_set_.polygonal_area_list->end()) {
-            if ((*area_it)->area_id == area_id) {
-              ClearContainerElement((*area_it)->coordinate_list);
-              delete (*area_it)->coordinate_list;
-              delete *area_it;
-              area_route_set_.polygonal_area_list->erase(area_it);
-              break;
-            } else {
-              ++area_it;
-            }
-          }
-        }
-        pro_para_.respond_result = kSuccess;
-      } else {
+      if ((area_route_set_.polygonal_area_list == nullptr) ||
+          (DeleteAreaRouteFromSet(msg_body, kPolygonal,
+                                  &area_route_set_) < 0)) {
         pro_para_.respond_result = kFailure;
+      } else {
+        pro_para_.respond_result = kSuccess;
+        WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
       }
-      WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
       pro_para_.respond_result = kSuccess;
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     case DOWN_SETROUTE:
-      operation = *msg_body++;
-      count = *msg_body++;
-      for (int i = 0; i < count; ++i) {
-        Route *route = new Route;
-        memcpy(&u32val, msg_body, 4);
-        route->route_id = EndianSwap32(u32val);
-        msg_body += 4;
-        memcpy(&u16val, msg_body, 2);
-        route->route_attribute.value = EndianSwap16(u16val);
-        msg_body += 2;
-        if (route->route_attribute.bit.bytime) {
-          memcpy(route->start_time, msg_body, 6);
-          msg_body += 6;
-          memcpy(route->end_time, msg_body, 6);
-          msg_body += 6;
-        }
-        memcpy(&u16val, msg_body, 2);
-        route->inflection_point_count = EndianSwap16(u16val);
-        msg_body += 2;
-        route->inflection_point_list = new std::vector<InflectionPoint *>;
-        for (int i = 0; i < route->inflection_point_count; ++i) {
-          InflectionPoint *inflection_point = new InflectionPoint;
-          memcpy(&u32val, msg_body, 4);
-          inflection_point->inflection_point_id = EndianSwap32(u32val);
-          msg_body += 4;
-          memcpy(&u32val, msg_body, 4);
-          inflection_point->road_section_id = EndianSwap32(u32val);
-          msg_body += 4;
-          memcpy(&u32val, msg_body, 4);
-          inflection_point->coordinate.latitude = EndianSwap32(u32val);
-          msg_body += 4;
-          memcpy(&u32val, msg_body, 4);
-          inflection_point->coordinate.longitude = EndianSwap32(u32val);
-          msg_body += 4;
-          inflection_point->road_section_wide = *msg_body++;
-          inflection_point->road_section_attribute.value = *msg_body++;
-          if (inflection_point->road_section_attribute.bit.traveltime) {
-            memcpy(&u16val, msg_body, 2);
-            inflection_point->max_driving_time = EndianSwap16(u16val);
-            msg_body += 2;
-            memcpy(&u16val, msg_body, 2);
-            inflection_point->min_driving_time = EndianSwap16(u16val);
-            msg_body += 2;
-          }
-          if (inflection_point->road_section_attribute.bit.speedlimit) {
-            memcpy(&u16val, msg_body, 2);
-            inflection_point->max_speed = EndianSwap16(u16val);
-            msg_body += 2;
-            inflection_point->overspeed_duration = *msg_body++;
-          }
-          route->inflection_point_list->push_back(inflection_point);
-        }
-        if (area_route_set_.route_list == nullptr) {
-          area_route_set_.route_list = new std::list<Route *>;
-        }
-        if (operation == kAppendArea) {
-          area_route_set_.route_list->push_back(route);
-        } else {
-          auto route_it = area_route_set_.route_list->begin();
-          while (route_it != area_route_set_.route_list->end()) {
-            if ((*route_it)->route_id == route->route_id) {
-              ClearContainerElement((*route_it)->inflection_point_list);
-              delete (*route_it)->inflection_point_list;
-              delete *route_it;
-              area_route_set_.route_list->erase(route_it);
-              area_route_set_.route_list->push_back(route);
-              break;
-            } else {
-              ++route_it;
-            }
-          }
-        }
-      }
-      if (count > 0) {
+      if (DealSetRouteAreaRequest(msg_body, &area_route_set_) == 0) {
         WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
         pro_para_.respond_result = kSuccess;
       } else {
         pro_para_.respond_result = kFailure;
       }
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     case DOWN_DELROUTE:
-      count = *msg_body++;
-      if (count == 0) {
-        if (area_route_set_.route_list != nullptr) {
-          auto route_it = area_route_set_.route_list->begin();
-          while (route_it != area_route_set_.route_list->end()) {
-            ClearContainerElement((*route_it)->inflection_point_list);
-            delete (*route_it)->inflection_point_list;
-            ++route_it;
-          }
-        }
-        ClearContainerElement(area_route_set_.route_list);
-        pro_para_.respond_result = kSuccess;
-      } else if (area_route_set_.route_list != nullptr) {
-        uint32_t route_id;
-        for (int i = 0; i < count; ++i) {
-          memcpy(&u32val, msg_body, 4);
-          route_id = EndianSwap32(u32val);
-          auto route_it = area_route_set_.route_list->begin();
-          while (route_it != area_route_set_.route_list->end()) {
-            if ((*route_it)->route_id == route_id) {
-              ClearContainerElement((*route_it)->inflection_point_list);
-              delete (*route_it)->inflection_point_list;
-              delete *route_it;
-              area_route_set_.route_list->erase(route_it);
-              break;
-            } else {
-              ++route_it;
-            }
-          }
-        }
-        pro_para_.respond_result = kSuccess;
-      } else {
+      if ((area_route_set_.route_list == nullptr) ||
+          (DeleteAreaRouteFromSet(msg_body, kRoute, &area_route_set_) < 0)) {
         pro_para_.respond_result = kFailure;
+      } else {
+        pro_para_.respond_result = kSuccess;
+        WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
       }
-      WriteAreaRouteToFile(kAreaRouteFlie, area_route_set_);
       pro_para_.respond_result = kSuccess;
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     case DOWN_PASSTHROUGH:
       printf("%s[%d]: received down passthrough\r\n", __FUNCTION__, __LINE__);
@@ -1346,9 +976,7 @@ uint16_t Jt808Terminal::Jt808FrameParse() {
       pass_through_.size = msgbody_attribute.bit.msglen - 1;
       memcpy(pass_through_.buffer, msg_body, pass_through_.size);
       pro_para_.respond_result = kSuccess;
-      memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
-      Jt808FramePack(UP_UNIRESPONSE);
-      SendFrameData();
+      SendCommonResponse();
       break;
     default:
       break;
@@ -1405,3 +1033,8 @@ void Jt808Terminal::ReportUpgradeResult(void) {
   dir_ptr = nullptr;
 }
 
+void Jt808Terminal::SendCommonResponse(void) {
+  memset(message_.buffer, 0x0, MAX_PROFRAMEBUF_LEN);
+  Jt808FramePack(UP_UNIRESPONSE);
+  SendFrameData();
+}

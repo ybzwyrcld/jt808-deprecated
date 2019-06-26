@@ -1,3 +1,17 @@
+// Copyright 2019 Yuming Meng. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #ifndef JT808_COMMON_JT808_POSITION_REPORT_H_
 #define JT808_COMMON_JT808_POSITION_REPORT_H_
 
@@ -143,7 +157,7 @@ union ExtendedVehicleSignalBit {
     uint32_t horn:1;  // 喇叭信号
     uint32_t airconditioner:1;  // 空调状态
     uint32_t neutral:1;  // 空挡信号
-    uint32_t retarder:1; // 缓速器工作
+    uint32_t retarder:1;  // 缓速器工作
     uint32_t abs:1;  // ABS 工作
     uint32_t heater:1;  // 加热器工作
     uint32_t clutch:1;  // 离合器状态
@@ -164,4 +178,4 @@ union IoStatusBit {
 
 #pragma pack(pop)
 
-#endif // JT808_COMMON_JT808_POSITION_REPORT_H_
+#endif  // JT808_COMMON_JT808_POSITION_REPORT_H_
